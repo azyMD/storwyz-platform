@@ -44,4 +44,3 @@ On the server, use the virtualenv:
 - Keep live deploy notes in `docs/wyzbox-platform/`.
 - Treat GitHub as source of truth for code and docs.
 - Treat Wyzbox as deploy target and production data host.
-
