@@ -1,0 +1,11 @@
+{% if page_obj.paginator.num_pages > 1 %}
+  <nav class="biz-pagination" aria-label="Pagination">
+    {% if page_obj.has_previous %}
+      <a class="button" href="?q={{ filters.q|urlencode }}&product_status={{ filters.product_status|urlencode }}&knowledge_status={{ filters.knowledge_status|urlencode }}&knowledge_type={{ filters.knowledge_type|urlencode }}&media_status={{ filters.media_status|urlencode }}&{{ page_param }}={{ page_obj.previous_page_number }}">Previous</a>
+    {% endif %}
+    <span>Page {{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
+    {% if page_obj.has_next %}
+      <a class="button" href="?q={{ filters.q|urlencode }}&product_status={{ filters.product_status|urlencode }}&knowledge_status={{ filters.knowledge_status|urlencode }}&knowledge_type={{ filters.knowledge_type|urlencode }}&media_status={{ filters.media_status|urlencode }}&{{ page_param }}={{ page_obj.next_page_number }}">Next</a>
+    {% endif %}
+  </nav>
+{% endif %}

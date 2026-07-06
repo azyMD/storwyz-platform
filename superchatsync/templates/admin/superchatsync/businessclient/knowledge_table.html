@@ -1,0 +1,46 @@
+<div class="biz-review__table-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th><input type="checkbox" data-check-all="knowledge_ids"></th>
+        <th>Knowledge</th>
+        <th>Product</th>
+        <th>Type</th>
+        <th>Score</th>
+        <th>Status</th>
+        <th>Source</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for item in page_obj.object_list %}
+        <tr>
+          <td><input type="checkbox" name="knowledge_ids" value="{{ item.pk }}"></td>
+          <td>
+            <a href="{% url 'admin:superchatsync_businessknowledgeitem_change' item.pk %}">{{ item.title|default:item.item_id }}</a>
+            <small>{{ item.body|truncatechars:260 }}</small>
+          </td>
+          <td>
+            {% if item.product %}
+              <a href="{% url 'admin:superchatsync_businessproduct_change' item.product.pk %}">{{ item.product.name }}</a>
+            {% else %}
+              -
+            {% endif %}
+          </td>
+          <td>{{ item.item_type }}</td>
+          <td>{{ item.confidence_score }}</td>
+          <td><span class="biz-pill">{{ item.status }}</span></td>
+          <td>
+            {% if item.source_url %}
+              <a href="{{ item.source_url }}" target="_blank" rel="noopener">Open</a>
+            {% else %}
+              -
+            {% endif %}
+            <small>{{ item.source_section|default:"" }}</small>
+          </td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="7">No knowledge items for current filters.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>

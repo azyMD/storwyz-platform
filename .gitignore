@@ -1,0 +1,51 @@
+# Secrets and local configuration
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*id_rsa*
+*ed25519*
+
+# Data dumps and databases
+*.sql
+*.sqlite
+*.sqlite-*
+*.db
+*.dump
+imports/
+media/
+staticfiles/
+logs/
+backups/
+
+# Python/runtime
+__pycache__/
+*.py[cod]
+.Python
+.venv/
+venv/
+env/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Local/editor/system files
+.DS_Store
+.idea/
+.vscode/
+
+# Historical server backup files copied from live host
+*.bak
+*.bak_*
+*.bak-*
+*.backup
+*.orig
+
+# Temporary Codex/work artifacts
+tmp_*
+*.remote
+*.discovery
+*.shortlinks
+work/
+

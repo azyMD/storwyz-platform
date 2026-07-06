@@ -1,0 +1,11 @@
+[Unit]
+Description=Run Superchat CRM daily FitExpress order sync every 24h
+
+[Timer]
+OnCalendar=*-*-* 03:30:00
+Persistent=true
+RandomizedDelaySec=15m
+Unit=superchat-fitexpress-daily-sync.service
+
+[Install]
+WantedBy=timers.target

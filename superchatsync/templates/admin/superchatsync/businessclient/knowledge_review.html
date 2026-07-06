@@ -1,0 +1,367 @@
+{% extends "admin/base_site.html" %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+  <a href="{% url 'admin:index' %}">Home</a>
+  &rsaquo; <a href="{% url 'admin:app_list' app_label=opts.app_label %}">{{ opts.app_config.verbose_name }}</a>
+  &rsaquo; <a href="{% url 'admin:superchatsync_businessclient_changelist' %}">Business Clients</a>
+  &rsaquo; {{ business.name }}
+</div>
+{% endblock %}
+
+{% block content %}
+<section class="biz-review">
+  <div class="biz-review__header">
+    <div>
+      <h1>{{ business.name }} knowledge review</h1>
+      <p>{{ business.domain }} · {{ business.default_language|upper }} · {{ business.default_currency|default:"-" }}</p>
+    </div>
+    <nav>
+      <a class="button" href="{% url 'admin:superchatsync_businessclient_change' business.pk %}">Business</a>
+      <a class="button" href="{{ admin_urls.products }}">Products</a>
+      <a class="button" href="{{ admin_urls.knowledge }}">Knowledge</a>
+      <a class="button" href="{{ admin_urls.media }}">Media</a>
+      <a class="button" href="{{ admin_urls.runs }}">Imports</a>
+    </nav>
+  </div>
+
+  <div class="biz-review__metrics">
+    {% for metric in metrics %}
+      <div class="biz-review__metric">
+        <span>{{ metric.label }}</span>
+        <strong>{{ metric.value }}</strong>
+      </div>
+    {% endfor %}
+  </div>
+
+  <form method="get" class="biz-review__filters">
+    <label>
+      Search
+      <input type="search" name="q" value="{{ filters.q }}" placeholder="product, text, source">
+    </label>
+    <label>
+      Product status
+      <select name="product_status">
+        <option value="">All</option>
+        {% for value in product_status_options %}
+          <option value="{{ value }}"{% if filters.product_status == value %} selected{% endif %}>{{ value }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>
+      Knowledge status
+      <select name="knowledge_status">
+        <option value="">All</option>
+        {% for value in status_options %}
+          <option value="{{ value }}"{% if filters.knowledge_status == value %} selected{% endif %}>{{ value }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>
+      Knowledge type
+      <select name="knowledge_type">
+        <option value="">All</option>
+        {% for value, label in knowledge_type_options %}
+          <option value="{{ value }}"{% if filters.knowledge_type == value %} selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>
+      Media status
+      <select name="media_status">
+        <option value="">All</option>
+        {% for value in status_options %}
+          <option value="{{ value }}"{% if filters.media_status == value %} selected{% endif %}>{{ value }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <div class="biz-review__filter-actions">
+      <button type="submit" class="button default">Apply</button>
+      <a class="button" href="{{ clear_url }}">Reset</a>
+    </div>
+  </form>
+
+  <form method="post" class="biz-review__workspace">
+    {% csrf_token %}
+
+    <section class="biz-review__panel">
+      <div class="biz-review__panel-head">
+        <h2>Products</h2>
+        <div>
+          <button type="submit" name="action" value="activate_products" class="button default">Activate selected</button>
+          <button type="submit" name="action" value="archive_products" class="button">Archive selected</button>
+        </div>
+      </div>
+      <div class="biz-review__table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th><input type="checkbox" data-check-all="product_ids"></th>
+              <th>Product</th>
+              <th>Type</th>
+              <th>Price</th>
+              <th>Status</th>
+              <th>Updated</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for product in products_page.object_list %}
+              <tr>
+                <td><input type="checkbox" name="product_ids" value="{{ product.pk }}"></td>
+                <td>
+                  <a href="{% url 'admin:superchatsync_businessproduct_change' product.pk %}">{{ product.name }}</a>
+                  <small>{{ product.slug }}</small>
+                </td>
+                <td>{{ product.product_type|default:"-" }}</td>
+                <td>{{ product.currency|default:"" }} {{ product.min_price|default:"-" }}{% if product.max_price and product.max_price != product.min_price %} - {{ product.max_price }}{% endif %}</td>
+                <td><span class="biz-pill">{{ product.status }}</span></td>
+                <td>{{ product.updated_at|date:"Y-m-d H:i" }}</td>
+              </tr>
+            {% empty %}
+              <tr><td colspan="6">No products for current filters.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% include "admin/superchatsync/businessclient/pagination.html" with page_obj=products_page page_param="products_page" %}
+    </section>
+
+    <section class="biz-review__panel">
+      <div class="biz-review__panel-head">
+        <h2>General knowledge</h2>
+        <div>
+          <button type="submit" name="action" value="approve_knowledge" class="button default">Approve selected</button>
+          <button type="submit" name="action" value="reject_knowledge" class="button">Reject selected</button>
+        </div>
+      </div>
+      {% include "admin/superchatsync/businessclient/knowledge_table.html" with page_obj=general_knowledge_page %}
+      {% include "admin/superchatsync/businessclient/pagination.html" with page_obj=general_knowledge_page page_param="general_page" %}
+    </section>
+
+    <section class="biz-review__panel">
+      <div class="biz-review__panel-head">
+        <h2>Product knowledge</h2>
+        <div>
+          <button type="submit" name="action" value="approve_knowledge" class="button default">Approve selected</button>
+          <button type="submit" name="action" value="reject_knowledge" class="button">Reject selected</button>
+        </div>
+      </div>
+      {% include "admin/superchatsync/businessclient/knowledge_table.html" with page_obj=product_knowledge_page %}
+      {% include "admin/superchatsync/businessclient/pagination.html" with page_obj=product_knowledge_page page_param="product_knowledge_page" %}
+    </section>
+
+    <section class="biz-review__panel">
+      <div class="biz-review__panel-head">
+        <h2>Media assets</h2>
+        <div>
+          <button type="submit" name="action" value="approve_media" class="button default">Approve selected</button>
+          <button type="submit" name="action" value="reject_media" class="button">Reject selected</button>
+        </div>
+      </div>
+      <div class="biz-review__media-grid">
+        {% for card in media_cards %}
+          <article class="biz-media">
+            <label class="biz-media__select">
+              <input type="checkbox" name="media_ids" value="{{ card.asset.pk }}">
+              <span>{{ card.asset.status }}</span>
+            </label>
+            <a href="{{ card.change_url }}">
+              <img src="{{ card.image_url }}" alt="{{ card.asset.alt_text|default:card.asset.title }}">
+            </a>
+            <div>
+              <strong>{{ card.asset.title|default:"Image" }}</strong>
+              {% if card.asset.product %}
+                <a href="{{ card.product_url }}">{{ card.asset.product.name }}</a>
+              {% endif %}
+              <small>{{ card.asset.image_role }} · {{ card.asset.width|default:"?" }}x{{ card.asset.height|default:"?" }}</small>
+            </div>
+          </article>
+        {% empty %}
+          <p>No media for current filters.</p>
+        {% endfor %}
+      </div>
+      {% include "admin/superchatsync/businessclient/pagination.html" with page_obj=media_page page_param="media_page" %}
+    </section>
+  </form>
+</section>
+
+<script>
+  document.querySelectorAll("[data-check-all]").forEach(function (checkbox) {
+    checkbox.addEventListener("change", function () {
+      var panel = checkbox.closest(".biz-review__panel") || document;
+      panel.querySelectorAll('input[name="' + checkbox.dataset.checkAll + '"]').forEach(function (item) {
+        item.checked = checkbox.checked;
+      });
+    });
+  });
+</script>
+
+<style>
+  .biz-review * { box-sizing: border-box; }
+  .biz-review__header {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    align-items: flex-start;
+    margin-bottom: 12px;
+  }
+  .biz-review__header h1 { margin: 0; }
+  .biz-review__header p { margin: 5px 0 0; color: var(--body-quiet-color); }
+  .biz-review__header nav,
+  .biz-review__filter-actions,
+  .biz-review__panel-head div {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .biz-review__metrics {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 10px;
+    margin: 12px 0;
+  }
+  .biz-review__metric {
+    min-height: 70px;
+    padding: 12px;
+    border: 1px solid var(--hairline-color);
+    border-radius: 8px;
+    background: var(--body-bg);
+  }
+  .biz-review__metric span {
+    display: block;
+    color: var(--body-quiet-color);
+    font-size: 12px;
+  }
+  .biz-review__metric strong {
+    display: block;
+    margin-top: 6px;
+    font-size: 24px;
+    line-height: 1;
+  }
+  .biz-review__filters {
+    display: grid;
+    grid-template-columns: minmax(240px, 2fr) repeat(4, minmax(150px, 1fr)) auto;
+    gap: 10px;
+    align-items: end;
+    margin: 12px 0 16px;
+    padding: 12px;
+    border: 1px solid var(--hairline-color);
+    border-radius: 8px;
+    background: var(--darkened-bg);
+  }
+  .biz-review__filters label {
+    display: grid;
+    gap: 4px;
+    color: var(--body-quiet-color);
+    font-size: 12px;
+  }
+  .biz-review__filters input,
+  .biz-review__filters select {
+    width: 100%;
+    min-height: 34px;
+  }
+  .biz-review__panel {
+    margin: 0 0 18px;
+    padding: 12px;
+    border: 1px solid var(--hairline-color);
+    border-radius: 8px;
+    background: var(--body-bg);
+  }
+  .biz-review__panel-head {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    align-items: center;
+    margin-bottom: 10px;
+  }
+  .biz-review__panel-head h2 {
+    margin: 0;
+    font-size: 18px;
+  }
+  .biz-review__table-wrap {
+    overflow: auto;
+  }
+  .biz-review table {
+    width: 100%;
+    min-width: 840px;
+    border-collapse: collapse;
+  }
+  .biz-review th,
+  .biz-review td {
+    padding: 8px;
+    border-bottom: 1px solid var(--hairline-color);
+    vertical-align: top;
+  }
+  .biz-review td small {
+    display: block;
+    margin-top: 4px;
+    color: var(--body-quiet-color);
+  }
+  .biz-pill {
+    display: inline-flex;
+    min-height: 24px;
+    align-items: center;
+    padding: 0 8px;
+    border: 1px solid var(--hairline-color);
+    border-radius: 999px;
+    background: var(--darkened-bg);
+    white-space: nowrap;
+  }
+  .biz-review__media-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 12px;
+  }
+  .biz-media {
+    display: grid;
+    gap: 8px;
+    padding: 8px;
+    border: 1px solid var(--hairline-color);
+    border-radius: 8px;
+    background: var(--darkened-bg);
+  }
+  .biz-media img {
+    width: 100%;
+    aspect-ratio: 1 / 1;
+    object-fit: contain;
+    border-radius: 6px;
+    background: #fff;
+  }
+  .biz-media__select {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    align-items: center;
+  }
+  .biz-media strong,
+  .biz-media a,
+  .biz-media small {
+    display: block;
+    overflow-wrap: anywhere;
+  }
+  .biz-media small {
+    color: var(--body-quiet-color);
+  }
+  .biz-pagination {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    align-items: center;
+    margin-top: 10px;
+  }
+  @media (max-width: 1100px) {
+    .biz-review__header,
+    .biz-review__panel-head {
+      display: grid;
+    }
+    .biz-review__filters {
+      grid-template-columns: 1fr 1fr;
+    }
+  }
+  @media (max-width: 700px) {
+    .biz-review__filters {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>
+{% endblock %}

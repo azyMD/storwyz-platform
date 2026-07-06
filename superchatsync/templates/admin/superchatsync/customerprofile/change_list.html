@@ -1,0 +1,492 @@
+{% extends "admin/change_list.html" %}
+
+{% block object-tools %}
+{{ block.super }}
+<section class="crm-workspace" aria-label="Customer profile CRM">
+  <div class="crm-topbar">
+    <div>
+      <h2>Customer profiles CRM</h2>
+      <p>Audience, lifecycle, contactability and campaign segments in one working view.</p>
+    </div>
+    <div class="crm-topbar__links">
+      <a href="{{ crm_segment_admin_url }}">Segments</a>
+      <a href="{{ crm_orders_admin_url }}">Orders</a>
+      <a href="{{ crm_events_admin_url }}">Events</a>
+    </div>
+  </div>
+
+  <div class="crm-metrics" aria-label="CRM metrics">
+    {% for metric in crm_metrics %}
+      <a class="crm-metric" href="{{ metric.href }}">
+        <span>{{ metric.label }}</span>
+        <strong>{{ metric.value }}</strong>
+      </a>
+    {% endfor %}
+  </div>
+
+  <nav class="crm-quick-filters" aria-label="Quick CRM views">
+    {% for item in crm_quick_filters %}
+      <a class="crm-quick-filter{% if item.active %} is-active{% endif %}" href="{{ item.href }}">{{ item.label }}</a>
+    {% endfor %}
+  </nav>
+
+  {% if crm_active_filters %}
+    <div class="crm-active-filters" aria-label="Active filters">
+      <span>Active</span>
+      {% for filter in crm_active_filters %}
+        <b>{{ filter }}</b>
+      {% endfor %}
+      <a href="{{ crm_clear_filters_url }}">Reset</a>
+    </div>
+  {% endif %}
+
+  <form id="crm-profile-filter-form" method="get" class="crm-filter-form">
+    <div class="crm-search-strip">
+      <label for="crm-filter-q">Search</label>
+      <input id="crm-filter-q" type="search" name="q" value="{{ crm_filter_values.q }}" placeholder="name, phone, email, conversation, product">
+      <button type="submit" class="button default">Apply filters</button>
+      <a href="{{ crm_clear_filters_url }}" class="button">Reset</a>
+    </div>
+
+    <details class="crm-filter-shell" open>
+      <summary>Audience filters</summary>
+      <div class="crm-filter-grid">
+        {% for group in crm_filter_groups %}
+          <fieldset class="crm-filter-group">
+            <legend>
+              {{ group.title }}
+              {% if group.selected %}
+                <span>{{ group.selected|length }}</span>
+              {% endif %}
+            </legend>
+            {% if group.searchable %}
+              <input class="crm-option-search" type="search" data-filter-search="{{ group.name }}" placeholder="Find {{ group.title|lower }}">
+            {% endif %}
+            <div class="crm-choice-grid{% if group.searchable %} crm-choice-grid--scroll{% endif %}" data-filter-list="{{ group.name }}">
+              {% for value, label in group.options %}
+                <label class="crm-choice{% if value in group.selected %} is-selected{% endif %}" data-choice-text="{{ label|lower }} {{ value|lower }}">
+                  <input type="checkbox" name="{{ group.name }}" value="{{ value }}"{% if value in group.selected %} checked{% endif %}>
+                  <span>{{ label }}</span>
+                </label>
+              {% empty %}
+                <span class="crm-empty">No values yet</span>
+              {% endfor %}
+            </div>
+          </fieldset>
+        {% endfor %}
+      </div>
+    </details>
+
+    <details class="crm-filter-shell" open>
+      <summary>Date filters</summary>
+      <div class="crm-date-grid">
+        <fieldset class="crm-filter-group crm-filter-group--wide">
+          <legend>
+            Quick last seen
+            {% if crm_filter_values.crm_recency %}
+              <span>{{ crm_filter_values.crm_recency|length }}</span>
+            {% endif %}
+          </legend>
+          <div class="crm-choice-grid">
+            {% for value, label in crm_filter_options.recencies %}
+              <label class="crm-choice{% if value in crm_filter_values.crm_recency %} is-selected{% endif %}">
+                <input type="checkbox" name="crm_recency" value="{{ value }}"{% if value in crm_filter_values.crm_recency %} checked{% endif %}>
+                <span>{{ label }}</span>
+              </label>
+            {% endfor %}
+          </div>
+        </fieldset>
+
+        <div class="crm-date-field">
+          <label for="crm-filter-last-from">Last seen from</label>
+          <input id="crm-filter-last-from" type="date" name="last_seen_at__date__gte" value="{{ crm_filter_values.last_seen_from }}">
+        </div>
+        <div class="crm-date-field">
+          <label for="crm-filter-last-to">Last seen to</label>
+          <input id="crm-filter-last-to" type="date" name="last_seen_at__date__lte" value="{{ crm_filter_values.last_seen_to }}">
+        </div>
+        <div class="crm-date-field">
+          <label for="crm-filter-first-from">First seen from</label>
+          <input id="crm-filter-first-from" type="date" name="first_seen_at__date__gte" value="{{ crm_filter_values.first_seen_from }}">
+        </div>
+        <div class="crm-date-field">
+          <label for="crm-filter-first-to">First seen to</label>
+          <input id="crm-filter-first-to" type="date" name="first_seen_at__date__lte" value="{{ crm_filter_values.first_seen_to }}">
+        </div>
+      </div>
+    </details>
+
+    <div class="crm-filter-actions">
+      <button type="submit" class="button default">Apply filters</button>
+      <a href="{{ crm_clear_filters_url }}" class="button">Reset all</a>
+    </div>
+  </form>
+</section>
+
+<style>
+  .crm-workspace {
+    clear: both;
+    margin: 0 0 18px;
+    color: var(--body-fg);
+  }
+  .crm-workspace * {
+    box-sizing: border-box;
+  }
+  .crm-topbar {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 16px;
+    border: 1px solid var(--hairline-color);
+    border-radius: 8px;
+    background: var(--body-bg);
+  }
+  .crm-topbar h2 {
+    margin: 0;
+    font-size: 18px;
+    line-height: 1.25;
+  }
+  .crm-topbar p {
+    margin: 5px 0 0;
+    color: var(--body-quiet-color);
+    font-size: 13px;
+  }
+  .crm-topbar__links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: flex-start;
+    justify-content: flex-end;
+  }
+  .crm-topbar__links a,
+  .crm-quick-filter,
+  .crm-active-filters b,
+  .crm-choice {
+    border: 1px solid var(--hairline-color);
+    border-radius: 999px;
+    background: var(--darkened-bg);
+  }
+  .crm-topbar__links a,
+  .crm-quick-filter {
+    display: inline-flex;
+    min-height: 32px;
+    align-items: center;
+    padding: 0 12px;
+    color: var(--link-fg);
+    text-decoration: none;
+    white-space: nowrap;
+  }
+  .crm-metrics {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 10px;
+    margin-top: 10px;
+  }
+  .crm-metric {
+    display: block;
+    min-height: 74px;
+    padding: 12px;
+    border: 1px solid var(--hairline-color);
+    border-radius: 8px;
+    background: var(--body-bg);
+    color: var(--body-fg);
+    text-decoration: none;
+  }
+  .crm-metric:nth-child(2) {
+    border-top-color: #0f766e;
+  }
+  .crm-metric:nth-child(3) {
+    border-top-color: #b45309;
+  }
+  .crm-metric:nth-child(4) {
+    border-top-color: #2563eb;
+  }
+  .crm-metric:nth-child(5) {
+    border-top-color: #7c3aed;
+  }
+  .crm-metric:nth-child(6) {
+    border-top-color: #be123c;
+  }
+  .crm-metric span {
+    display: block;
+    color: var(--body-quiet-color);
+    font-size: 12px;
+  }
+  .crm-metric strong {
+    display: block;
+    margin-top: 6px;
+    font-size: 24px;
+    line-height: 1;
+  }
+  .crm-quick-filters,
+  .crm-active-filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 10px;
+    align-items: center;
+  }
+  .crm-quick-filter.is-active,
+  .crm-choice.is-selected {
+    border-color: #0f766e;
+    background: rgba(15, 118, 110, 0.16);
+    color: var(--body-fg);
+    font-weight: 700;
+  }
+  .crm-active-filters {
+    padding: 10px 12px;
+    border: 1px solid var(--hairline-color);
+    border-radius: 8px;
+    background: var(--body-bg);
+  }
+  .crm-active-filters span {
+    color: var(--body-quiet-color);
+    font-weight: 700;
+  }
+  .crm-active-filters b {
+    padding: 5px 10px;
+    font-weight: 600;
+  }
+  .crm-filter-form {
+    margin-top: 10px;
+    padding: 14px;
+    border: 1px solid var(--hairline-color);
+    border-radius: 8px;
+    background: var(--body-bg);
+  }
+  .crm-search-strip {
+    display: grid;
+    grid-template-columns: minmax(80px, 110px) minmax(220px, 1fr) auto auto;
+    gap: 10px;
+    align-items: center;
+  }
+  .crm-search-strip label,
+  .crm-date-field label {
+    color: var(--body-quiet-color);
+    font-size: 12px;
+    font-weight: 700;
+  }
+  .crm-search-strip input,
+  .crm-option-search,
+  .crm-date-field input {
+    width: 100%;
+    min-height: 36px;
+  }
+  .crm-filter-shell {
+    margin-top: 12px;
+    border-top: 1px solid var(--hairline-color);
+  }
+  .crm-filter-shell summary {
+    cursor: pointer;
+    padding: 12px 0;
+    font-size: 13px;
+    font-weight: 700;
+  }
+  .crm-filter-grid,
+  .crm-date-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(180px, 1fr));
+    gap: 12px;
+  }
+  .crm-filter-group,
+  .crm-date-field {
+    min-width: 0;
+    margin: 0;
+    padding: 10px;
+    border: 1px solid var(--hairline-color);
+    border-radius: 8px;
+    background: var(--darkened-bg);
+  }
+  .crm-filter-group--wide {
+    grid-column: span 2;
+  }
+  .crm-filter-group legend {
+    display: flex;
+    width: 100%;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 0;
+    color: var(--body-fg);
+    font-size: 12px;
+    font-weight: 700;
+  }
+  .crm-filter-group legend span {
+    color: var(--body-quiet-color);
+  }
+  .crm-option-search {
+    margin: 8px 0;
+  }
+  .crm-choice-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 7px;
+  }
+  .crm-choice-grid--scroll {
+    max-height: 180px;
+    overflow: auto;
+    padding-right: 2px;
+  }
+  .crm-choice {
+    position: relative;
+    display: inline-flex;
+    min-height: 31px;
+    max-width: 100%;
+    align-items: center;
+    padding: 0 10px;
+    cursor: pointer;
+    color: var(--link-fg);
+    font-size: 12px;
+  }
+  .crm-choice input {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
+  }
+  .crm-choice span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .crm-choice:focus-within {
+    outline: 2px solid var(--link-fg);
+    outline-offset: 2px;
+  }
+  .crm-empty {
+    color: var(--body-quiet-color);
+    font-size: 12px;
+  }
+  .crm-date-field {
+    display: grid;
+    gap: 6px;
+    align-content: start;
+  }
+  .crm-filter-actions {
+    position: sticky;
+    bottom: 0;
+    z-index: 2;
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+    margin: 14px -14px -14px;
+    padding: 10px 14px;
+    border-top: 1px solid var(--hairline-color);
+    background: var(--body-bg);
+  }
+  #toolbar,
+  #changelist-filter {
+    display: none !important;
+  }
+  #changelist.filtered .results,
+  #changelist.filtered .paginator,
+  #changelist.filtered .actions {
+    margin-right: 0 !important;
+  }
+  #changelist .results {
+    overflow-x: auto;
+  }
+  #result_list {
+    min-width: 1180px;
+  }
+  #result_list th,
+  #result_list td {
+    vertical-align: middle;
+  }
+  #result_list td.field-display_name {
+    min-width: 190px;
+    font-weight: 700;
+    white-space: normal;
+  }
+  @media (max-width: 1100px) {
+    .crm-metrics {
+      grid-template-columns: repeat(3, minmax(120px, 1fr));
+    }
+    .crm-filter-grid,
+    .crm-date-grid {
+      grid-template-columns: repeat(2, minmax(170px, 1fr));
+    }
+  }
+  @media (max-width: 720px) {
+    .crm-topbar {
+      display: block;
+      padding: 13px;
+    }
+    .crm-topbar__links {
+      justify-content: flex-start;
+      margin-top: 10px;
+    }
+    .crm-metrics {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+    .crm-metric {
+      min-height: 66px;
+      padding: 10px;
+    }
+    .crm-metric strong {
+      font-size: 20px;
+    }
+    .crm-search-strip {
+      grid-template-columns: 1fr;
+    }
+    .crm-filter-grid,
+    .crm-date-grid {
+      grid-template-columns: 1fr;
+    }
+    .crm-filter-group--wide {
+      grid-column: auto;
+    }
+    .crm-filter-actions {
+      justify-content: stretch;
+    }
+    .crm-filter-actions .button {
+      flex: 1;
+      text-align: center;
+    }
+  }
+</style>
+
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    var form = document.getElementById("crm-profile-filter-form");
+    if (!form) {
+      return;
+    }
+
+    form.querySelectorAll(".crm-choice input[type='checkbox']").forEach(function (input) {
+      var label = input.closest(".crm-choice");
+      var sync = function () {
+        label.classList.toggle("is-selected", input.checked);
+      };
+      input.addEventListener("change", sync);
+      sync();
+    });
+
+    form.querySelectorAll("[data-filter-search]").forEach(function (search) {
+      var target = form.querySelector("[data-filter-list='" + search.dataset.filterSearch + "']");
+      if (!target) {
+        return;
+      }
+      search.addEventListener("input", function () {
+        var term = search.value.trim().toLowerCase();
+        target.querySelectorAll(".crm-choice").forEach(function (choice) {
+          var haystack = choice.dataset.choiceText || choice.textContent.toLowerCase();
+          choice.hidden = term && haystack.indexOf(term) === -1;
+        });
+      });
+    });
+
+    form.addEventListener("submit", function () {
+      form.querySelectorAll("input[type='search'][name], input[type='date']").forEach(function (field) {
+        if (!field.value) {
+          field.disabled = true;
+        }
+      });
+      form.querySelectorAll("input[type='checkbox']").forEach(function (field) {
+        if (!field.checked) {
+          field.disabled = true;
+        }
+      });
+    });
+  });
+</script>
+{% endblock %}

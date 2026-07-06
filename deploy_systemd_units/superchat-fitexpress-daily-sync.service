@@ -1,0 +1,14 @@
+[Unit]
+Description=Superchat CRM daily FitExpress order sync
+After=network-online.target postgresql.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=nobel
+Group=nobel
+WorkingDirectory=/opt/superchat-ai-agent/web
+Environment="PATH=/opt/superchat-ai-agent/venv/bin"
+Environment="PYTHONUNBUFFERED=1"
+ExecStart=/opt/superchat-ai-agent/venv/bin/python /opt/superchat-ai-agent/web/manage.py sync_fitexpress_daily_orders --apply --lookback-days 2 --sleep-seconds 2
+Nice=5
