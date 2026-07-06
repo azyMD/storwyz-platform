@@ -61,6 +61,7 @@ Active WhatsApp agent routes:
 - [04-peeko-business-agent.md](04-peeko-business-agent.md) - Peeko business client, knowledge base, templates, shortlinks.
 - [05-referral-heatmap-telegram-bot.md](05-referral-heatmap-telegram-bot.md) - separate Telegram analytics bot.
 - [06-todo-risks-decisions.md](06-todo-risks-decisions.md) - next work, risks, open decisions.
+- [07-catalog-and-shortlinks.md](07-catalog-and-shortlinks.md) - catalog brochure builder and shortlink click tracking modules.
 
 ## How To Use This Pack
 
@@ -72,4 +73,3 @@ Active WhatsApp agent routes:
 ## Important Rule
 
 Do not paste or store secrets here. No passwords, API tokens, Cloudflare tunnel tokens, Telegram bot tokens, Superchat tokens, or `.env` contents.
-

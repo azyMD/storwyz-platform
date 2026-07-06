@@ -9,6 +9,8 @@ This inventory tracks the projects found across local Codex chats and their GitH
 | Chat / Project | Local source | GitHub status | Notes |
 | --- | --- | --- | --- |
 | Customer profile CRM / Storwyz platform | `2026-06-24/files-mentioned-by-the-user-export/github_work/storwyz-platform` | Uploaded: `azyMD/storwyz-platform` | Main Django CRM + WhatsApp AI platform. |
+| Catalog brochure builder | inside `storwyz-platform`: `superchatsync/catalog_builder.py` | Uploaded inside `azyMD/storwyz-platform` | Public product catalog/brochure pages and `/catalog-admin/`. |
+| Shortlink service | inside `storwyz-platform`: `superchatsync/shortlinks.py`, `views_shortlinks.py` | Uploaded inside `azyMD/storwyz-platform` | `/r/<code>/` redirects, click tracking and Peeko template attribution. |
 | Telegram Bot / Referral heatmap | `2026-06-24/files-mentioned-by-the-user-export/github_work/referral-heatmap-bot` | Prepared locally, waiting for GitHub repo | Suggested repo: `azyMD/referral-heatmap-bot`. |
 | LiveBid Romania MVP | `2026-06-24/files-mentioned-by-the-user-export/github_work/live-bidding-mvp` | Prepared locally, waiting for GitHub repo | Suggested repo: `azyMD/live-bidding-mvp`. |
 
@@ -77,3 +79,39 @@ Alternative:
 
 Run `gh auth login -h github.com`, then Codex can create and push the repos through GitHub CLI.
 
+## Modules Included In `storwyz-platform`
+
+These were missed as explicit rows in the first inventory pass, but the code is already in the main GitHub repo:
+
+### Catalog brochure builder
+
+Tracked files:
+
+- `superchatsync/catalog_builder.py`
+- catalog routes in `config/urls.py`
+
+Routes:
+
+- `/catalog-admin/`
+- `/catalog-admin/create/`
+- `/catalog/<product_slug>/<country_code>/`
+- `/<product_slug>/<country_code>/`
+
+Generated media under `MEDIA_ROOT/catalog_brochures` is not committed.
+
+### Shortlink service
+
+Tracked files:
+
+- `superchatsync/shortlinks.py`
+- `superchatsync/views_shortlinks.py`
+- `superchatsync/migrations/0010_shortlinks.py`
+- `ShortLink` and `ShortLinkClick` in `superchatsync/models.py`
+- admin registration in `superchatsync/admin.py`
+
+Routes:
+
+- `/r/<code>/`
+- `/shortlinks/`
+
+Used by Peeko WhatsApp template flows for click tracking and attribution.

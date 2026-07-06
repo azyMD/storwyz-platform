@@ -66,6 +66,11 @@ Shortlinks:
 - `ShortLink`
 - `ShortLinkClick`
 
+Catalog:
+
+- `catalog_builder.py` module for public product brochure/catalog pages.
+- Catalog routes are Django views inside `superchatsync`, not a separate app.
+
 ## CRM Design Decisions
 
 Customer identity:
@@ -160,6 +165,6 @@ Important admin areas:
 - Business clients and business knowledge
 - Shortlinks and clicks
 - WhatsApp agent inbox routes
+- Catalog admin and public catalog pages
 
 The admin UI was repeatedly adjusted for mobile usability and performance. Keep future changes lightweight and query-aware because profile/order counts are now in the millions.
-
