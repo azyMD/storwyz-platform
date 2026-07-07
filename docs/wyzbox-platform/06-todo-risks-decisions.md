@@ -1,6 +1,6 @@
 # TODO, Risks And Open Decisions
 
-Last updated: 2026-07-06
+Last updated: 2026-07-07
 
 ## Immediate TODO
 
@@ -40,6 +40,7 @@ CRM:
 - Make product and country filters display names, not only ids.
 - Improve date filters and saved segment/list workflows.
 - Add stronger customer profile detail page for all channels, not WhatsApp-centric.
+- Continue consolidating technical admin tables behind unified workspaces; Knowledge Center is the first unified entry point for knowledge workflows.
 
 Data import:
 
@@ -121,3 +122,6 @@ On 2026-07-06:
 - Peeko route: active on `+15559680919`
 - ButchAxe route: active on `+15559875079`
 
+On 2026-07-07:
+
+- Added a unified Knowledge Center admin workspace as the preferred entry point for product docs, business knowledge, media review, conversation-derived suggestions, shortlinks/catalog links and agent readiness.

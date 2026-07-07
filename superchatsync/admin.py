@@ -5877,6 +5877,7 @@ from .models import (
     BusinessMediaAsset,
     BusinessProduct,
     BusinessProductRanking,
+    KnowledgeCenterLink,
     ShortLink,
     ShortLinkClick,
     WhatsappAgentInboxRoute,
@@ -5885,6 +5886,295 @@ from django.conf import settings
 from django.db.models import Count, Q
 from django.template.response import TemplateResponse
 from django.urls import path, reverse
+
+
+def _kc_count(queryset):
+    try:
+        return queryset.count()
+    except Exception:
+        return 0
+
+
+def _kc_admin_url(name, *args):
+    try:
+        return reverse(f"admin:{name}", args=args)
+    except Exception:
+        return "#"
+
+
+def _kc_status_counts(queryset, field="status"):
+    try:
+        return {
+            str(row[field] or "empty"): row["count"]
+            for row in queryset.values(field).annotate(count=Count("pk"))
+        }
+    except Exception:
+        return {}
+
+
+@admin.register(KnowledgeCenterLink)
+class KnowledgeCenterAdmin(admin.ModelAdmin):
+    def has_add_permission(self, request):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+    def changelist_view(self, request, extra_context=None):
+        context = self.admin_site.each_context(request)
+        context.update(
+            {
+                "opts": self.model._meta,
+                "title": "Knowledge Center",
+                **self._build_context(request),
+            }
+        )
+        return TemplateResponse(
+            request,
+            "admin/superchatsync/knowledge_center.html",
+            context,
+        )
+
+    def _build_context(self, request):
+        product_imports = ProductKnowledgeImport.objects.all()
+        product_items = ProductKnowledgeItem.objects.all()
+        creative_assets = ProductCreativeAsset.objects.all()
+        business_clients = BusinessClient.objects.all()
+        business_products = BusinessProduct.objects.all()
+        business_knowledge = BusinessKnowledgeItem.objects.all()
+        business_media = BusinessMediaAsset.objects.all()
+        business_runs = BusinessKnowledgeImportRun.objects.all()
+        suggestions = ProductFeedSuggestion.objects.all()
+
+        import_status = _kc_status_counts(product_imports)
+        item_status = _kc_status_counts(product_items)
+        asset_status = _kc_status_counts(creative_assets, "is_active")
+        business_product_status = _kc_status_counts(business_products)
+        business_knowledge_status = _kc_status_counts(business_knowledge)
+        business_media_status = _kc_status_counts(business_media)
+        suggestion_status = _kc_status_counts(suggestions)
+
+        pending_product_items = item_status.get("pending_review", 0) + item_status.get("pending", 0)
+        approved_unapplied_product_items = _kc_count(
+            product_items.filter(status="approved", applied_at__isnull=True)
+        )
+        draft_business_knowledge = business_knowledge_status.get("draft", 0)
+        draft_business_media = business_media_status.get("draft", 0)
+        draft_business_products = business_product_status.get("draft", 0)
+        pending_suggestions = suggestion_status.get("pending_review", 0) + suggestion_status.get("pending", 0)
+
+        metrics = [
+            {
+                "label": "Product docs",
+                "value": _kc_count(product_imports),
+                "hint": f"{import_status.get('uploaded', 0)} uploaded · {import_status.get('queued', 0)} queued",
+                "href": _kc_admin_url("superchatsync_productknowledgeimport_changelist"),
+            },
+            {
+                "label": "Extracted items",
+                "value": _kc_count(product_items),
+                "hint": f"{pending_product_items} need review · {approved_unapplied_product_items} approved unapplied",
+                "href": _kc_admin_url("superchatsync_productknowledgeitem_changelist"),
+            },
+            {
+                "label": "Business clients",
+                "value": _kc_count(business_clients),
+                "hint": f"{_kc_count(business_clients.filter(status='active'))} active",
+                "href": _kc_admin_url("superchatsync_businessclient_changelist"),
+            },
+            {
+                "label": "Business knowledge",
+                "value": _kc_count(business_knowledge),
+                "hint": f"{draft_business_knowledge} draft · {business_knowledge_status.get('approved', 0)} approved",
+                "href": _kc_admin_url("superchatsync_businessknowledgeitem_changelist"),
+            },
+            {
+                "label": "Media assets",
+                "value": _kc_count(business_media) + _kc_count(creative_assets),
+                "hint": f"{draft_business_media} business draft · {asset_status.get('True', 0)} product active",
+                "href": _kc_admin_url("superchatsync_businessmediaasset_changelist"),
+            },
+            {
+                "label": "Knowledge gaps",
+                "value": pending_suggestions,
+                "hint": "suggestions from conversation analysis",
+                "href": _kc_admin_url("superchatsync_productfeedsuggestion_changelist"),
+            },
+        ]
+
+        next_actions = []
+        if pending_product_items:
+            next_actions.append(
+                {
+                    "title": "Review extracted product knowledge",
+                    "body": f"{pending_product_items} Fitexpress/product knowledge items need approval.",
+                    "href": _kc_admin_url("superchatsync_productknowledgeitem_changelist") + "?status__exact=pending_review",
+                    "label": "Review items",
+                    "priority": "high",
+                }
+            )
+        if approved_unapplied_product_items:
+            next_actions.append(
+                {
+                    "title": "Apply approved product knowledge",
+                    "body": f"{approved_unapplied_product_items} approved items are not yet applied to the agent knowledge base.",
+                    "href": _kc_admin_url("superchatsync_productknowledgeitem_changelist") + "?status__exact=approved",
+                    "label": "Apply approved",
+                    "priority": "high",
+                }
+            )
+        if draft_business_knowledge:
+            next_actions.append(
+                {
+                    "title": "Approve business knowledge",
+                    "body": f"{draft_business_knowledge} business knowledge items are still draft.",
+                    "href": _kc_admin_url("superchatsync_businessknowledgeitem_changelist") + "?status__exact=draft",
+                    "label": "Open drafts",
+                    "priority": "medium",
+                }
+            )
+        if draft_business_media:
+            next_actions.append(
+                {
+                    "title": "Approve business media",
+                    "body": f"{draft_business_media} product images/media assets are waiting for review.",
+                    "href": _kc_admin_url("superchatsync_businessmediaasset_changelist") + "?status__exact=draft",
+                    "label": "Review media",
+                    "priority": "medium",
+                }
+            )
+        if draft_business_products:
+            next_actions.append(
+                {
+                    "title": "Activate imported business products",
+                    "body": f"{draft_business_products} imported products are still draft.",
+                    "href": _kc_admin_url("superchatsync_businessproduct_changelist") + "?status__exact=draft",
+                    "label": "Open products",
+                    "priority": "medium",
+                }
+            )
+        if pending_suggestions:
+            next_actions.append(
+                {
+                    "title": "Review conversation-derived knowledge gaps",
+                    "body": f"{pending_suggestions} suggestions came from conversation analysis.",
+                    "href": _kc_admin_url("superchatsync_productfeedsuggestion_changelist") + "?status__exact=pending_review",
+                    "label": "Open suggestions",
+                    "priority": "low",
+                }
+            )
+        if not next_actions:
+            next_actions.append(
+                {
+                    "title": "Knowledge queues are clear",
+                    "body": "No urgent review queue is visible right now.",
+                    "href": _kc_admin_url("superchatsync_businessclient_changelist"),
+                    "label": "Open clients",
+                    "priority": "low",
+                }
+            )
+
+        business_cards = []
+        for business in business_clients.order_by("name")[:12]:
+            business_cards.append(
+                {
+                    "business": business,
+                    "review_url": _kc_admin_url("superchatsync_businessclient_knowledge_review", business.pk),
+                    "products": _kc_count(BusinessProduct.objects.filter(business=business)),
+                    "active_products": _kc_count(BusinessProduct.objects.filter(business=business, status="active")),
+                    "knowledge": _kc_count(BusinessKnowledgeItem.objects.filter(business=business)),
+                    "draft_knowledge": _kc_count(BusinessKnowledgeItem.objects.filter(business=business, status="draft")),
+                    "media": _kc_count(BusinessMediaAsset.objects.filter(business=business)),
+                    "draft_media": _kc_count(BusinessMediaAsset.objects.filter(business=business, status="draft")),
+                    "runs": _kc_count(BusinessKnowledgeImportRun.objects.filter(business=business)),
+                }
+            )
+
+        workflows = [
+            {
+                "title": "Product document knowledge",
+                "body": "Upload product docs, extract structured knowledge, review uncertain items, then apply approved facts/rules to the agent.",
+                "steps": ["Upload", "Extract", "Review", "Apply"],
+                "primary": {
+                    "label": "Upload document",
+                    "href": _kc_admin_url("superchatsync_productknowledgeimport_add"),
+                },
+                "secondary": [
+                    {"label": "Imports", "href": _kc_admin_url("superchatsync_productknowledgeimport_changelist")},
+                    {"label": "Extracted items", "href": _kc_admin_url("superchatsync_productknowledgeitem_changelist")},
+                    {"label": "Creative assets", "href": _kc_admin_url("superchatsync_productcreativeasset_changelist")},
+                ],
+            },
+            {
+                "title": "Business website knowledge",
+                "body": "For clients like Peeko: crawl/import products, review product facts and images, activate usable catalog data.",
+                "steps": ["Import", "Review", "Approve", "Use in agent"],
+                "primary": {
+                    "label": "Business clients",
+                    "href": _kc_admin_url("superchatsync_businessclient_changelist"),
+                },
+                "secondary": [
+                    {"label": "Products", "href": _kc_admin_url("superchatsync_businessproduct_changelist")},
+                    {"label": "Knowledge", "href": _kc_admin_url("superchatsync_businessknowledgeitem_changelist")},
+                    {"label": "Media", "href": _kc_admin_url("superchatsync_businessmediaasset_changelist")},
+                    {"label": "Import runs", "href": _kc_admin_url("superchatsync_businessknowledgeimportrun_changelist")},
+                ],
+            },
+            {
+                "title": "Conversation learning loop",
+                "body": "Use conversation analysis and AI roadmap to detect missing answers, convert gaps into knowledge, and improve the agent.",
+                "steps": ["Analyze", "Suggest", "Approve", "Test"],
+                "primary": {
+                    "label": "AI roadmap",
+                    "href": _kc_admin_url("superchatsync_aidecisionroadmap_changelist"),
+                },
+                "secondary": [
+                    {"label": "Conversations", "href": _kc_admin_url("superchatsync_conversation_changelist")},
+                    {"label": "Suggestions", "href": _kc_admin_url("superchatsync_productfeedsuggestion_changelist")},
+                    {"label": "Agent routes", "href": _kc_admin_url("superchatsync_whatsappagentinboxroute_changelist")},
+                ],
+            },
+            {
+                "title": "Link and catalog assets",
+                "body": "Manage shortlinks, click attribution, product catalog pages and creative links used in WhatsApp flows.",
+                "steps": ["Create", "Send", "Track", "Optimize"],
+                "primary": {
+                    "label": "Shortlinks",
+                    "href": "/shortlinks/",
+                },
+                "secondary": [
+                    {"label": "ShortLink admin", "href": _kc_admin_url("superchatsync_shortlink_changelist")},
+                    {"label": "Click logs", "href": _kc_admin_url("superchatsync_shortlinkclick_changelist")},
+                    {"label": "Catalog admin", "href": "/catalog-admin/"},
+                ],
+            },
+        ]
+
+        recent_product_imports = product_imports.select_related("product").order_by("-created_at")[:8]
+        recent_business_runs = business_runs.select_related("business").order_by("-started_at")[:8]
+
+        technical_links = [
+            {"label": "Product imports", "href": _kc_admin_url("superchatsync_productknowledgeimport_changelist")},
+            {"label": "Product items", "href": _kc_admin_url("superchatsync_productknowledgeitem_changelist")},
+            {"label": "Product creatives", "href": _kc_admin_url("superchatsync_productcreativeasset_changelist")},
+            {"label": "Business clients", "href": _kc_admin_url("superchatsync_businessclient_changelist")},
+            {"label": "Business products", "href": _kc_admin_url("superchatsync_businessproduct_changelist")},
+            {"label": "Business knowledge", "href": _kc_admin_url("superchatsync_businessknowledgeitem_changelist")},
+            {"label": "Business media", "href": _kc_admin_url("superchatsync_businessmediaasset_changelist")},
+            {"label": "Crawl pages", "href": _kc_admin_url("superchatsync_businesscrawlpage_changelist")},
+            {"label": "Import runs", "href": _kc_admin_url("superchatsync_businessknowledgeimportrun_changelist")},
+            {"label": "Agent routes", "href": _kc_admin_url("superchatsync_whatsappagentinboxroute_changelist")},
+        ]
+
+        return {
+            "metrics": metrics,
+            "next_actions": next_actions,
+            "business_cards": business_cards,
+            "workflows": workflows,
+            "recent_product_imports": recent_product_imports,
+            "recent_business_runs": recent_business_runs,
+            "technical_links": technical_links,
+        }
 
 
 @admin.register(BusinessClient)

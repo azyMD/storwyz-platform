@@ -961,6 +961,17 @@ class AiSalesDashboardLink(models.Model):
         return "AI Sales Dashboard"
 
 
+class KnowledgeCenterLink(models.Model):
+    class Meta:
+        managed = False
+        verbose_name = "Knowledge Center"
+        verbose_name_plural = "Knowledge Center"
+        app_label = "superchatsync"
+
+    def __str__(self):
+        return "Knowledge Center"
+
+
 
 # --- Product Knowledge Imports ---
 import uuid as _knowledge_uuid

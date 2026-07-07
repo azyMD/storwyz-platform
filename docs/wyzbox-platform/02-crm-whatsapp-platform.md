@@ -1,6 +1,6 @@
 # CRM And WhatsApp AI Platform
 
-Last updated: 2026-07-06
+Last updated: 2026-07-07
 
 ## Purpose
 
@@ -48,6 +48,7 @@ WhatsApp/Superchat:
 - `AiDecisionRoadmap`
 - `AiLlmCallLog`
 - `WhatsappAgentInboxRoute`
+- `KnowledgeCenterLink`
 
 Knowledge and creative assets:
 
@@ -155,6 +156,7 @@ Known anti-patterns:
 
 Important admin areas:
 
+- Knowledge Center unified workspace
 - Customer profiles CRM
 - Orders
 - Events
@@ -166,5 +168,7 @@ Important admin areas:
 - Shortlinks and clicks
 - WhatsApp agent inbox routes
 - Catalog admin and public catalog pages
+
+Knowledge Center is the preferred entry point for day-to-day knowledge work. It combines product document imports, extracted knowledge items, business website knowledge, business products, media assets, conversation-derived suggestions, shortlinks/catalog links and agent route readiness into one admin workspace. The underlying technical tables remain available for audit/debug.
 
 The admin UI was repeatedly adjusted for mobile usability and performance. Keep future changes lightweight and query-aware because profile/order counts are now in the millions.

@@ -1,0 +1,360 @@
+{% extends "admin/base_site.html" %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+  <a href="{% url 'admin:index' %}">Home</a>
+  &rsaquo; Knowledge Center
+</div>
+{% endblock %}
+
+{% block content %}
+<section class="knowledge-center">
+  <div class="kc-header">
+    <div>
+      <h1>Knowledge Center</h1>
+      <p>One workspace for product knowledge, business catalogs, media assets, conversation gaps and agent readiness.</p>
+    </div>
+    <nav>
+      <a class="button" href="{% url 'admin:superchatsync_productknowledgeimport_add' %}">Add product doc</a>
+      <a class="button" href="{% url 'admin:superchatsync_businessclient_changelist' %}">Business clients</a>
+      <a class="button" href="{% url 'admin:superchatsync_whatsappagentinboxroute_changelist' %}">Agent routes</a>
+    </nav>
+  </div>
+
+  <div class="kc-metrics">
+    {% for metric in metrics %}
+      <a class="kc-metric" href="{{ metric.href }}">
+        <span>{{ metric.label }}</span>
+        <strong>{{ metric.value }}</strong>
+        <small>{{ metric.hint }}</small>
+      </a>
+    {% endfor %}
+  </div>
+
+  <section class="kc-section">
+    <div class="kc-section-head">
+      <h2>Next Actions</h2>
+      <p>Queues that need a human decision before the agents can use the knowledge cleanly.</p>
+    </div>
+    <div class="kc-actions">
+      {% for action in next_actions %}
+        <article class="kc-action kc-action--{{ action.priority }}">
+          <div>
+            <h3>{{ action.title }}</h3>
+            <p>{{ action.body }}</p>
+          </div>
+          <a class="button" href="{{ action.href }}">{{ action.label }}</a>
+        </article>
+      {% endfor %}
+    </div>
+  </section>
+
+  <section class="kc-section">
+    <div class="kc-section-head">
+      <h2>Unified Workflows</h2>
+      <p>Use these paths instead of jumping through separate technical tables.</p>
+    </div>
+    <div class="kc-workflows">
+      {% for workflow in workflows %}
+        <article class="kc-workflow">
+          <h3>{{ workflow.title }}</h3>
+          <p>{{ workflow.body }}</p>
+          <ol>
+            {% for step in workflow.steps %}
+              <li>{{ step }}</li>
+            {% endfor %}
+          </ol>
+          <div class="kc-links">
+            <a class="button default" href="{{ workflow.primary.href }}">{{ workflow.primary.label }}</a>
+            {% for link in workflow.secondary %}
+              <a class="button" href="{{ link.href }}">{{ link.label }}</a>
+            {% endfor %}
+          </div>
+        </article>
+      {% endfor %}
+    </div>
+  </section>
+
+  <section class="kc-section">
+    <div class="kc-section-head">
+      <h2>Business Knowledge</h2>
+      <p>Client-level catalog, product facts and media readiness.</p>
+    </div>
+    <div class="kc-business-grid">
+      {% for card in business_cards %}
+        <article class="kc-business">
+          <header>
+            <div>
+              <h3>{{ card.business.name }}</h3>
+              <p>{{ card.business.slug }} · {{ card.business.domain|default:"no domain" }}</p>
+            </div>
+            <span>{{ card.business.status }}</span>
+          </header>
+          <dl>
+            <div><dt>Products</dt><dd>{{ card.active_products }} / {{ card.products }} active</dd></div>
+            <div><dt>Knowledge</dt><dd>{{ card.draft_knowledge }} draft / {{ card.knowledge }}</dd></div>
+            <div><dt>Media</dt><dd>{{ card.draft_media }} draft / {{ card.media }}</dd></div>
+            <div><dt>Runs</dt><dd>{{ card.runs }}</dd></div>
+          </dl>
+          <a class="button default" href="{{ card.review_url }}">Open workspace</a>
+        </article>
+      {% empty %}
+        <p>No business clients yet.</p>
+      {% endfor %}
+    </div>
+  </section>
+
+  <section class="kc-columns">
+    <div class="kc-section">
+      <div class="kc-section-head">
+        <h2>Recent Product Docs</h2>
+        <p>Fitexpress/product document ingestion.</p>
+      </div>
+      <div class="kc-table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Document</th>
+              <th>Product</th>
+              <th>Status</th>
+              <th>Items</th>
+              <th>Updated</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for item in recent_product_imports %}
+              <tr>
+                <td><a href="{% url 'admin:superchatsync_productknowledgeimport_change' item.pk %}">{{ item.title|default:item.original_filename|default:item.import_id }}</a></td>
+                <td>{{ item.product|default:"-" }}</td>
+                <td><span class="kc-pill">{{ item.status }}</span></td>
+                <td>{{ item.suggestions_created_count }} suggestions</td>
+                <td>{{ item.updated_at|date:"Y-m-d H:i" }}</td>
+              </tr>
+            {% empty %}
+              <tr><td colspan="5">No product documents yet.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="kc-section">
+      <div class="kc-section-head">
+        <h2>Recent Business Imports</h2>
+        <p>Website/catalog crawl and media extraction runs.</p>
+      </div>
+      <div class="kc-table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Business</th>
+              <th>Source</th>
+              <th>Status</th>
+              <th>Products</th>
+              <th>Knowledge</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for run in recent_business_runs %}
+              <tr>
+                <td>{{ run.business.name }}</td>
+                <td>{{ run.source_type }}</td>
+                <td><span class="kc-pill">{{ run.status }}</span></td>
+                <td>{{ run.products_imported }}</td>
+                <td>{{ run.knowledge_items_created }}</td>
+              </tr>
+            {% empty %}
+              <tr><td colspan="5">No business import runs yet.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <details class="kc-section kc-technical">
+    <summary>Technical Tables</summary>
+    <p>These are still available for audit/debug, but daily work should start from the workflows above.</p>
+    <div class="kc-links">
+      {% for link in technical_links %}
+        <a class="button" href="{{ link.href }}">{{ link.label }}</a>
+      {% endfor %}
+    </div>
+  </details>
+</section>
+
+<style>
+  .knowledge-center * { box-sizing: border-box; }
+  .kc-header,
+  .kc-section-head,
+  .kc-business header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 16px;
+  }
+  .kc-header h1,
+  .kc-section h2,
+  .kc-workflow h3,
+  .kc-action h3,
+  .kc-business h3 {
+    margin: 0;
+  }
+  .kc-header p,
+  .kc-section-head p,
+  .kc-workflow p,
+  .kc-action p,
+  .kc-business p,
+  .kc-technical p {
+    margin: 5px 0 0;
+    color: var(--body-quiet-color);
+  }
+  .kc-header nav,
+  .kc-links,
+  .kc-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .kc-metrics {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+    gap: 10px;
+    margin: 14px 0;
+  }
+  .kc-metric,
+  .kc-section,
+  .kc-workflow,
+  .kc-action,
+  .kc-business {
+    border: 1px solid var(--hairline-color);
+    border-radius: 8px;
+    background: var(--body-bg);
+  }
+  .kc-metric {
+    min-height: 92px;
+    padding: 12px;
+    color: inherit;
+    text-decoration: none;
+  }
+  .kc-metric span,
+  .kc-metric small {
+    display: block;
+    color: var(--body-quiet-color);
+  }
+  .kc-metric strong {
+    display: block;
+    margin-top: 7px;
+    font-size: 28px;
+    line-height: 1;
+  }
+  .kc-section {
+    margin: 0 0 16px;
+    padding: 12px;
+  }
+  .kc-actions {
+    margin-top: 12px;
+  }
+  .kc-action {
+    width: min(100%, 520px);
+    min-height: 94px;
+    padding: 12px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 14px;
+  }
+  .kc-action--high { border-left: 4px solid #ba2121; }
+  .kc-action--medium { border-left: 4px solid #f5a623; }
+  .kc-action--low { border-left: 4px solid #2c7be5; }
+  .kc-workflows,
+  .kc-business-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 12px;
+    margin-top: 12px;
+  }
+  .kc-workflow,
+  .kc-business {
+    padding: 12px;
+  }
+  .kc-workflow ol {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin: 12px 0;
+    padding: 0;
+    list-style: none;
+  }
+  .kc-workflow li,
+  .kc-pill,
+  .kc-business header span {
+    display: inline-flex;
+    min-height: 24px;
+    align-items: center;
+    padding: 0 8px;
+    border: 1px solid var(--hairline-color);
+    border-radius: 999px;
+    background: var(--darkened-bg);
+    white-space: nowrap;
+  }
+  .kc-business dl {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin: 12px 0;
+  }
+  .kc-business dl div {
+    padding: 8px;
+    border-radius: 8px;
+    background: var(--darkened-bg);
+  }
+  .kc-business dt {
+    color: var(--body-quiet-color);
+    font-size: 12px;
+  }
+  .kc-business dd {
+    margin: 4px 0 0;
+    font-weight: 650;
+  }
+  .kc-columns {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+    gap: 16px;
+  }
+  .kc-table-wrap {
+    margin-top: 10px;
+    overflow: auto;
+  }
+  .knowledge-center table {
+    width: 100%;
+    min-width: 680px;
+    border-collapse: collapse;
+  }
+  .knowledge-center th,
+  .knowledge-center td {
+    padding: 8px;
+    border-bottom: 1px solid var(--hairline-color);
+    text-align: left;
+    vertical-align: top;
+  }
+  .kc-technical summary {
+    cursor: pointer;
+    font-weight: 700;
+  }
+  .kc-technical .kc-links {
+    margin-top: 10px;
+  }
+  @media (max-width: 760px) {
+    .kc-header,
+    .kc-section-head,
+    .kc-action,
+    .kc-business header {
+      display: grid;
+    }
+    .kc-columns {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>
+{% endblock %}
