@@ -972,6 +972,17 @@ class KnowledgeCenterLink(models.Model):
         return "Knowledge Center"
 
 
+class PeekoWorkspaceLink(models.Model):
+    class Meta:
+        managed = False
+        verbose_name = "Peeko Workspace"
+        verbose_name_plural = "Peeko Workspace"
+        app_label = "superchatsync"
+
+    def __str__(self):
+        return "Peeko Workspace"
+
+
 
 # --- Product Knowledge Imports ---
 import uuid as _knowledge_uuid

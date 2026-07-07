@@ -1,6 +1,6 @@
 # CRM And WhatsApp AI Platform
 
-Last updated: 2026-07-07
+Last updated: 2026-07-08
 
 ## Purpose
 
@@ -49,6 +49,7 @@ WhatsApp/Superchat:
 - `AiLlmCallLog`
 - `WhatsappAgentInboxRoute`
 - `KnowledgeCenterLink`
+- `PeekoWorkspaceLink`
 
 Knowledge and creative assets:
 
@@ -168,7 +169,10 @@ Important admin areas:
 - Shortlinks and clicks
 - WhatsApp agent inbox routes
 - Catalog admin and public catalog pages
+- Peeko workspace at `/peeko-admin/`
 
 Knowledge Center is the preferred entry point for day-to-day knowledge work. It combines product document imports, extracted knowledge items, business website knowledge, business products, media assets, conversation-derived suggestions, shortlinks/catalog links and agent route readiness into one admin workspace. The underlying technical tables remain available for audit/debug.
+
+Peeko has a separate Django admin site at `/peeko-admin/`. It uses the same Django auth database, but access is limited to superusers or staff users in the `Peeko Team` / `Peeko Admin` group. The Peeko site registers only Peeko-scoped admin models and filters querysets server-side by `business.slug=peeko`, Peeko shortlink `business_slug`, and Peeko WhatsApp route/conversation metadata. Customer profiles are intentionally not exposed there yet because customer profiles are still global and need an explicit tenant/business mapping before Peeko staff can safely see them.
 
 The admin UI was repeatedly adjusted for mobile usability and performance. Keep future changes lightweight and query-aware because profile/order counts are now in the millions.

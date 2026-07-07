@@ -1,6 +1,6 @@
 # TODO, Risks And Open Decisions
 
-Last updated: 2026-07-07
+Last updated: 2026-07-08
 
 ## Immediate TODO
 
@@ -18,12 +18,14 @@ WhatsApp routing:
 
 Peeko:
 
+- Use `/peeko-admin/` for Peeko team operations; access is limited to staff users in `Peeko Team` / `Peeko Admin` or superusers.
 - Improve discovery flow before templates.
 - Avoid repeated same response.
 - Use list CTA only when the customer explicitly asks for a category with many sub-options.
 - Use product templates only when a product recommendation is contextually useful.
 - Track link clicks through shortlinks and decide final handoff/no-reply behavior after more tests.
 - Finalize exact template URL base/extension settings in Superchat.
+- Add tenant/business mapping to global customer profiles before exposing profile CRM inside the Peeko workspace.
 
 Fitexpress/ButchAxe:
 
@@ -125,3 +127,7 @@ On 2026-07-06:
 On 2026-07-07:
 
 - Added a unified Knowledge Center admin workspace as the preferred entry point for product docs, business knowledge, media review, conversation-derived suggestions, shortlinks/catalog links and agent readiness.
+
+On 2026-07-08:
+
+- Added a separate Peeko admin site at `/peeko-admin/` with Peeko-only products, rankings, knowledge, media, import runs, crawl pages, WhatsApp routes, conversations, messages, shortlinks and click logs.

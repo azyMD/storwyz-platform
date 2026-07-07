@@ -11,6 +11,7 @@ from django.utils import timezone
 from django.utils.html import escape
 import uuid
 
+from superchatsync.peeko_admin import peeko_admin_site
 from superchatsync.views_shortlinks import shortlink_redirect, shortlinks_dashboard
 
 
@@ -18,6 +19,7 @@ from superchatsync.views_shortlinks import shortlink_redirect, shortlinks_dashbo
 urlpatterns = [
     path("r/<slug:code>/", shortlink_redirect, name="shortlink_redirect"),
     path("shortlinks/", shortlinks_dashboard, name="shortlinks_dashboard"),
+    path("peeko-admin/", peeko_admin_site.urls),
     path("admin/", admin.site.urls),
 ]
 

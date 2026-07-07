@@ -1,0 +1,323 @@
+{% extends "admin/base_site.html" %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+  <a href="{% url 'peeko_admin:index' %}">Home</a>
+  &rsaquo; Peeko Workspace
+</div>
+{% endblock %}
+
+{% block content %}
+<section class="peeko-workspace">
+  <div class="pk-header">
+    <div>
+      <h1>Peeko Workspace</h1>
+      {% if business %}
+        <p>{{ business.domain|default:"peeko.co.uk" }} - {{ business.default_language|upper }} - {{ business.default_currency|default:"-" }}</p>
+      {% else %}
+        <p>Peeko business profile is not configured yet.</p>
+      {% endif %}
+    </div>
+    <nav>
+      <a class="button default" href="{{ links.products }}">Products</a>
+      <a class="button" href="{{ links.knowledge }}">Knowledge</a>
+      <a class="button" href="{{ links.media }}">Media</a>
+      <a class="button" href="{{ links.conversations }}">Conversations</a>
+    </nav>
+  </div>
+
+  <div class="pk-metrics">
+    {% for metric in metrics %}
+      <article class="pk-metric">
+        <span>{{ metric.label }}</span>
+        <strong>{{ metric.value }}</strong>
+        <small>{{ metric.hint }}</small>
+      </article>
+    {% endfor %}
+  </div>
+
+  <section class="pk-section">
+    <div class="pk-section-head">
+      <h2>Next Actions</h2>
+      <p>Operational queues visible only for the Peeko team.</p>
+    </div>
+    <div class="pk-actions">
+      {% for action in next_actions %}
+        <article class="pk-action pk-action--{{ action.priority }}">
+          <div>
+            <h3>{{ action.title }}</h3>
+            <p>{{ action.body }}</p>
+          </div>
+          <a class="button" href="{{ action.href }}">{{ action.label }}</a>
+        </article>
+      {% endfor %}
+    </div>
+  </section>
+
+  <section class="pk-section">
+    <div class="pk-section-head">
+      <h2>Operations</h2>
+      <p>Peeko-only tables. Data is filtered server-side by business and inbox route.</p>
+    </div>
+    <div class="pk-links">
+      <a class="button default" href="{{ links.business }}">Business profile</a>
+      <a class="button" href="{{ links.products }}">Products</a>
+      <a class="button" href="{{ links.rankings }}">Trending rankings</a>
+      <a class="button" href="{{ links.knowledge }}">Knowledge</a>
+      <a class="button" href="{{ links.media }}">Media</a>
+      <a class="button" href="{{ links.crawl_pages }}">Crawl pages</a>
+      <a class="button" href="{{ links.runs }}">Import runs</a>
+      <a class="button" href="{{ links.routes }}">WhatsApp routes</a>
+      <a class="button" href="{{ links.shortlinks }}">Shortlinks</a>
+      <a class="button" href="{{ links.clicks }}">Clicks</a>
+      <a class="button" href="{{ links.messages }}">Messages</a>
+    </div>
+  </section>
+
+  <section class="pk-grid">
+    <article class="pk-section">
+      <div class="pk-section-head">
+        <h2>Recent Products</h2>
+        <a href="{{ links.products }}">View all</a>
+      </div>
+      <div class="pk-table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Product</th>
+              <th>Type</th>
+              <th>Price</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for product in recent_products %}
+              <tr>
+                <td>{{ product.name }}<small>{{ product.slug }}</small></td>
+                <td>{{ product.product_type|default:"-" }}</td>
+                <td>{{ product.currency|default:"" }} {{ product.min_price|default:"-" }}</td>
+                <td><span class="pk-pill">{{ product.status }}</span></td>
+              </tr>
+            {% empty %}
+              <tr><td colspan="4">No Peeko products yet.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </article>
+
+    <article class="pk-section">
+      <div class="pk-section-head">
+        <h2>Recent Conversations</h2>
+        <a href="{{ links.conversations }}">View all</a>
+      </div>
+      <div class="pk-table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Conversation</th>
+              <th>Client</th>
+              <th>Last message</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for conversation in recent_conversations %}
+              <tr>
+                <td>{{ conversation.conversation_id|truncatechars:22 }}</td>
+                <td>{{ conversation.client_name|default:conversation.client_phone|default:"-" }}</td>
+                <td>{{ conversation.last_message_at|date:"Y-m-d H:i" }}</td>
+              </tr>
+            {% empty %}
+              <tr><td colspan="3">No Peeko conversations yet.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </article>
+
+    <article class="pk-section">
+      <div class="pk-section-head">
+        <h2>Recent Shortlinks</h2>
+        <a href="{{ links.shortlinks }}">View all</a>
+      </div>
+      <div class="pk-table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Code</th>
+              <th>Product</th>
+              <th>Clicks</th>
+              <th>Created</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for link in recent_shortlinks %}
+              <tr>
+                <td>{{ link.code }}</td>
+                <td>{{ link.product_name|default:link.intent|default:"-" }}</td>
+                <td>{{ link.click_count }}</td>
+                <td>{{ link.created_at|date:"Y-m-d H:i" }}</td>
+              </tr>
+            {% empty %}
+              <tr><td colspan="4">No Peeko shortlinks yet.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </article>
+
+    <article class="pk-section">
+      <div class="pk-section-head">
+        <h2>Recent Imports</h2>
+        <a href="{{ links.runs }}">View all</a>
+      </div>
+      <div class="pk-table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Source</th>
+              <th>Status</th>
+              <th>Products</th>
+              <th>Knowledge</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for run in recent_runs %}
+              <tr>
+                <td>{{ run.source_type }}</td>
+                <td><span class="pk-pill">{{ run.status }}</span></td>
+                <td>{{ run.products_imported }}</td>
+                <td>{{ run.knowledge_items_created }}</td>
+              </tr>
+            {% empty %}
+              <tr><td colspan="4">No Peeko import runs yet.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </article>
+  </section>
+</section>
+
+<style>
+  .peeko-workspace * { box-sizing: border-box; }
+  .pk-header,
+  .pk-section-head,
+  .pk-action {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 14px;
+  }
+  .pk-header h1,
+  .pk-section h2,
+  .pk-action h3 {
+    margin: 0;
+  }
+  .pk-header p,
+  .pk-section-head p,
+  .pk-action p {
+    margin: 5px 0 0;
+    color: var(--body-quiet-color);
+  }
+  .pk-header nav,
+  .pk-links,
+  .pk-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .pk-metrics {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 10px;
+    margin: 14px 0;
+  }
+  .pk-metric,
+  .pk-section,
+  .pk-action {
+    border: 1px solid var(--hairline-color);
+    border-radius: 8px;
+    background: var(--body-bg);
+  }
+  .pk-metric {
+    min-height: 84px;
+    padding: 12px;
+  }
+  .pk-metric span,
+  .pk-metric small {
+    display: block;
+    color: var(--body-quiet-color);
+  }
+  .pk-metric strong {
+    display: block;
+    margin-top: 7px;
+    font-size: 28px;
+    line-height: 1;
+  }
+  .pk-section {
+    margin: 0 0 16px;
+    padding: 12px;
+  }
+  .pk-actions {
+    margin-top: 12px;
+  }
+  .pk-action {
+    width: min(100%, 520px);
+    min-height: 88px;
+    padding: 12px;
+    align-items: center;
+  }
+  .pk-action--high { border-left: 4px solid #ba2121; }
+  .pk-action--medium { border-left: 4px solid #f5a623; }
+  .pk-action--low { border-left: 4px solid #2c7be5; }
+  .pk-links {
+    margin-top: 12px;
+  }
+  .pk-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+    gap: 16px;
+  }
+  .pk-table-wrap {
+    margin-top: 10px;
+    overflow: auto;
+  }
+  .peeko-workspace table {
+    width: 100%;
+    min-width: 520px;
+    border-collapse: collapse;
+  }
+  .peeko-workspace th,
+  .peeko-workspace td {
+    padding: 8px;
+    border-bottom: 1px solid var(--hairline-color);
+    text-align: left;
+    vertical-align: top;
+  }
+  .peeko-workspace small {
+    display: block;
+    color: var(--body-quiet-color);
+  }
+  .pk-pill {
+    display: inline-flex;
+    min-height: 24px;
+    align-items: center;
+    padding: 0 8px;
+    border: 1px solid var(--hairline-color);
+    border-radius: 999px;
+    background: var(--darkened-bg);
+    white-space: nowrap;
+  }
+  @media (max-width: 760px) {
+    .pk-header,
+    .pk-section-head,
+    .pk-action {
+      display: grid;
+    }
+    .pk-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>
+{% endblock %}
