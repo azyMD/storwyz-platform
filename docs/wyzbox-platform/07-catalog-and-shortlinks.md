@@ -1,6 +1,6 @@
 # Catalog And Shortlinks
 
-Last updated: 2026-07-06
+Last updated: 2026-07-07
 
 These are separate functional modules inside `storwyz-platform`, not separate repositories.
 
@@ -11,6 +11,7 @@ Purpose:
 - Create lightweight public product catalog/brochure pages.
 - Upload page/product images through a simple admin UI.
 - Serve product/country catalog pages under Storwyz/Catalog routes.
+- Catalog brochures no longer enforce a fixed page-count limit; all uploaded valid images are kept.
 
 Main files:
 
@@ -104,4 +105,3 @@ Both modules are included in:
 - Local repo: `github_work/storwyz-platform`
 
 They should remain in the main Django repo unless they grow into an independently deployed service.
-

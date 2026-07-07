@@ -18,7 +18,6 @@ from django.views.decorators.http import require_POST
 CATALOG_ADMIN_USER = os.getenv("CATALOG_ADMIN_USER", "admin")
 CATALOG_ADMIN_PASSWORD = os.getenv("CATALOG_ADMIN_PASSWORD")
 CATALOG_SESSION_KEY = "catalog_admin_logged_in"
-MAX_PAGES = 10
 CATALOG_DIR = Path(settings.MEDIA_ROOT) / "catalog_brochures"
 ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".avif"}
 
@@ -146,7 +145,6 @@ def catalog_admin(request):
             csrf_token=escape(token),
             countries_options=countries_options,
             brochure_rows=brochure_rows,
-            max_pages=MAX_PAGES,
         ),
         content_type="text/html; charset=utf-8",
     )
@@ -182,8 +180,6 @@ def catalog_create(request):
         return JsonResponse({"ok": False, "error": "Alege o țară validă."}, status=400)
     if not files:
         return JsonResponse({"ok": False, "error": "Încarcă cel puțin o pagină."}, status=400)
-    if len(files) > MAX_PAGES:
-        return JsonResponse({"ok": False, "error": f"Poți încărca maximum {MAX_PAGES} pagini."}, status=400)
 
     product_slug = _slugify(product_name)
     target = _safe_catalog_path(product_slug, country_code)
@@ -605,7 +601,7 @@ ADMIN_HTML = """
   <header>
     <div>
       <h1>Catalog Admin</h1>
-      <p>Generează broșuri HTML din imagini, până la {max_pages} pagini.</p>
+      <p>Generează broșuri HTML din imaginile încărcate.</p>
     </div>
     <a href="/catalog-admin/logout/">Logout</a>
   </header>
@@ -630,7 +626,7 @@ ADMIN_HTML = """
         <div class="drop">
           <label for="pageFiles">Pagini broșură</label>
           <input id="pageFiles" type="file" accept="image/*" multiple>
-          <p class="note">Selectează maximum {max_pages} poze. Trage thumbnail-urile ca să alegi ordinea finală.</p>
+          <p class="note">Selectează pozele pentru broșură. Trage thumbnail-urile ca să alegi ordinea finală.</p>
         </div>
         <div class="thumbs" id="thumbs"></div>
         <div class="actions">
@@ -662,7 +658,6 @@ ADMIN_HTML = """
   </main>
 
   <script>
-    const MAX_PAGES = {max_pages};
     const fileInput = document.getElementById("pageFiles");
     const thumbs = document.getElementById("thumbs");
     const form = document.getElementById("createForm");
@@ -723,13 +718,9 @@ ADMIN_HTML = """
 
     fileInput.addEventListener("change", () => {{
       selected.forEach((item) => URL.revokeObjectURL(item.url));
-      const files = Array.from(fileInput.files).filter((file) => file.type.startsWith("image/")).slice(0, MAX_PAGES);
+      const files = Array.from(fileInput.files).filter((file) => file.type.startsWith("image/"));
       selected = files.map((file) => ({{ file, url: URL.createObjectURL(file) }}));
-      if (fileInput.files.length > MAX_PAGES) {{
-        statusText.textContent = `Am păstrat primele ${{MAX_PAGES}} imagini.`;
-      }} else {{
-        statusText.textContent = `${{selected.length}} pagini selectate.`;
-      }}
+      statusText.textContent = `${{selected.length}} pagini selectate.`;
       renderThumbs();
     }});
 
@@ -789,7 +780,7 @@ def _public_html(manifest):
     product_slug = manifest.get("product_slug") or _slugify(product_name)
     country_code = manifest.get("country_code") or "ro"
     image_items = []
-    for page in pages[:MAX_PAGES]:
+    for page in pages:
         filename = page.get("filename", "")
         src = f"{settings.MEDIA_URL}catalog_brochures/{product_slug}/{country_code}/{filename}"
         image_items.append({"src": src, "alt": f"{product_name} pagina {page.get('number', '')}"})
