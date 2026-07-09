@@ -4,6 +4,17 @@ Last updated: 2026-07-08
 
 ## Immediate TODO
 
+Production hardening follow-up:
+
+- Configure a non-empty Superchat webhook secret and the matching Superchat HTTP-request authentication in one cutover.
+- Put Django Admin, Peeko Admin and Cockpit behind Cloudflare Access.
+- Move Wyzbox Storage credentials out of the systemd unit and rotate them.
+- Secure or retire the unauthenticated legacy Leads create endpoint on port 8095.
+- Plan UFW and SSH password-auth changes with a tested rollback session.
+- Copy verified PostgreSQL backups off-server and enable point-in-time recovery.
+- Run a complete restore drill on the DR server.
+- Move private product-knowledge documents out of the public media location.
+
 Documentation/process:
 
 - Keep this folder updated after every meaningful live change.

@@ -26,6 +26,12 @@ Main services:
 
 - `superchat-web.service`
 - `superchat-celery-worker.service`
+- `storwyz-postgres-backup.timer`
+
+Health endpoints:
+
+- `/healthz/` - process liveness.
+- `/readyz/` - PostgreSQL and Redis readiness.
 
 Earlier runtime used Gunicorn on:
 
@@ -79,6 +85,9 @@ superchat-celery-worker.service: active
 manage.py check: no issues
 ```
 
+Production hardening and backup verification performed on 2026-07-09 is documented in
+`08-production-hardening.md`.
+
 ## Deploy Hygiene Used So Far
 
 Before editing remote files:
@@ -111,4 +120,3 @@ Recommended:
 - Keep `.env` out of documentation.
 - Use per-person SSH keys.
 - Use least-privilege service users where possible.
-

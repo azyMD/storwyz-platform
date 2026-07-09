@@ -62,6 +62,7 @@ Active WhatsApp agent routes:
 - [05-referral-heatmap-telegram-bot.md](05-referral-heatmap-telegram-bot.md) - separate Telegram analytics bot.
 - [06-todo-risks-decisions.md](06-todo-risks-decisions.md) - next work, risks, open decisions.
 - [07-catalog-and-shortlinks.md](07-catalog-and-shortlinks.md) - catalog brochure builder and shortlink click tracking modules.
+- [08-production-hardening.md](08-production-hardening.md) - production security, health checks, backups and remaining controlled cutovers.
 
 ## How To Use This Pack
 
