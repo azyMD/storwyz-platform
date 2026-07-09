@@ -17,7 +17,9 @@ Application security:
 Nginx:
 
 - HTTP requests for Storwyz domains redirect to HTTPS.
+- HTTP requests for the Cockpit health hostname redirect to HTTPS.
 - Cloudflare's forwarded protocol is preserved for Django.
+- Cloudflare client addresses are restored only from the trusted local tunnel process.
 - The duplicate catch-all server-name conflict was removed.
 - The storage service now has the explicit `storage.storwyz.com` server name.
 - Configured TLS protocols are limited to TLS 1.2 and TLS 1.3.
