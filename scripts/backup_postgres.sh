@@ -22,7 +22,10 @@ trap cleanup EXIT
 pg_dump --format=custom --compress=6 --file="${temporary_dump}" "${database}"
 pg_restore --list "${temporary_dump}" >/dev/null
 mv "${temporary_dump}" "${final_dump}"
-sha256sum "${final_dump}" >"${checksum_file}"
+(
+    cd "${backup_dir}"
+    sha256sum "$(basename "${final_dump}")"
+) >"${checksum_file}"
 pg_dumpall --globals-only >"${globals_file}"
 chmod 600 "${final_dump}" "${checksum_file}" "${globals_file}"
 
