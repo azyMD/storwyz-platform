@@ -1,6 +1,6 @@
 # Catalog And Shortlinks
 
-Last updated: 2026-07-07
+Last updated: 2026-07-08
 
 These are separate functional modules inside `storwyz-platform`, not separate repositories.
 
@@ -12,6 +12,8 @@ Purpose:
 - Upload page/product images through a simple admin UI.
 - Serve product/country catalog pages under Storwyz/Catalog routes.
 - Catalog brochures no longer enforce a fixed page-count limit; all uploaded valid images are kept.
+- Catalog admin and public viewer UI are in English.
+- Supported country codes include `cz` Czechia, `sk` Slovakia, `hr` Croatia and `tr` Turkey.
 
 Main files:
 

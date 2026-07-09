@@ -22,19 +22,23 @@ CATALOG_DIR = Path(settings.MEDIA_ROOT) / "catalog_brochures"
 ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".avif"}
 
 COUNTRIES = [
-    ("ro", "România"),
+    ("ro", "Romania"),
     ("md", "Moldova"),
-    ("es", "Spania"),
-    ("it", "Italia"),
-    ("fr", "Franța"),
-    ("de", "Germania"),
-    ("uk", "Marea Britanie"),
-    ("us", "Statele Unite"),
-    ("pt", "Portugalia"),
-    ("pl", "Polonia"),
+    ("es", "Spain"),
+    ("it", "Italy"),
+    ("fr", "France"),
+    ("de", "Germany"),
+    ("uk", "United Kingdom"),
+    ("us", "United States"),
+    ("pt", "Portugal"),
+    ("pl", "Poland"),
     ("bg", "Bulgaria"),
-    ("hu", "Ungaria"),
-    ("gr", "Grecia"),
+    ("hu", "Hungary"),
+    ("gr", "Greece"),
+    ("cz", "Czechia"),
+    ("sk", "Slovakia"),
+    ("hr", "Croatia"),
+    ("tr", "Turkey"),
 ]
 
 
@@ -46,7 +50,7 @@ def _slugify(value):
     normalized = unicodedata.normalize("NFKD", value or "")
     ascii_value = normalized.encode("ascii", "ignore").decode("ascii")
     slug = re.sub(r"[^a-zA-Z0-9]+", "-", ascii_value).strip("-").lower()
-    return slug[:80] or "produs"
+    return slug[:80] or "product"
 
 
 def _country_label(code):
@@ -69,7 +73,7 @@ def _manifest_path(product_slug, country_code):
 def _read_manifest(product_slug, country_code):
     path = _manifest_path(product_slug, country_code)
     if not path.exists():
-        raise Http404("Broșura nu există.")
+        raise Http404("Brochure does not exist.")
     return json.loads(path.read_text(encoding="utf-8"))
 
 
@@ -138,7 +142,7 @@ def catalog_admin(request):
         </tr>
         """
         for item in brochures
-    ) or '<tr><td colspan="5" class="empty">Încă nu există broșuri.</td></tr>'
+    ) or '<tr><td colspan="5" class="empty">No brochures yet.</td></tr>'
 
     return HttpResponse(
         ADMIN_HTML.format(
@@ -175,11 +179,11 @@ def catalog_create(request):
     files = request.FILES.getlist("pages")
 
     if not product_name:
-        return JsonResponse({"ok": False, "error": "Completează numele produsului."}, status=400)
+        return JsonResponse({"ok": False, "error": "Enter the product name."}, status=400)
     if country_code not in dict(COUNTRIES):
-        return JsonResponse({"ok": False, "error": "Alege o țară validă."}, status=400)
+        return JsonResponse({"ok": False, "error": "Choose a valid country."}, status=400)
     if not files:
-        return JsonResponse({"ok": False, "error": "Încarcă cel puțin o pagină."}, status=400)
+        return JsonResponse({"ok": False, "error": "Upload at least one page."}, status=400)
 
     product_slug = _slugify(product_name)
     target = _safe_catalog_path(product_slug, country_code)
@@ -194,7 +198,7 @@ def catalog_create(request):
             ext = Path(uploaded_file.name).suffix.lower()
             if ext not in ALLOWED_EXTENSIONS or not (uploaded_file.content_type or "").startswith("image/"):
                 return JsonResponse(
-                    {"ok": False, "error": "Sunt acceptate doar imagini jpg, png, webp sau avif."},
+                    {"ok": False, "error": "Only jpg, png, webp or avif images are accepted."},
                     status=400,
                 )
             filename = f"page-{index:02d}{ext}"
@@ -276,7 +280,7 @@ def _product_catalog_html(manifest):
     ]
     pages_json = json.dumps(pages, ensure_ascii=False)
     title = escape(product_name)
-    country_label = escape(manifest.get("country_label") or country_code.upper())
+    country_label = escape(_country_label(country_code))
 
     return f"""
 <!doctype html>
@@ -402,7 +406,7 @@ def _login_html(request, error=False):
     token = get_token(request)
     return f"""
     <!doctype html>
-    <html lang="ro">
+    <html lang="en">
     <head>
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -456,12 +460,12 @@ def _login_html(request, error=False):
       <form method="post" action="/catalog-admin/login/">
         <input type="hidden" name="csrfmiddlewaretoken" value="{escape(token)}">
         <h1>Catalog Admin</h1>
-        <label>Utilizator</label>
+        <label>Username</label>
         <input name="username" autocomplete="username" autofocus>
-        <label>Parolă</label>
+        <label>Password</label>
         <input name="password" type="password" autocomplete="current-password">
-        <button type="submit">Intră</button>
-        {'<p class="error">Credentiale greșite.</p>' if error else ''}
+        <button type="submit">Sign in</button>
+        {'<p class="error">Invalid credentials.</p>' if error else ''}
       </form>
     </body>
     </html>
@@ -470,7 +474,7 @@ def _login_html(request, error=False):
 
 ADMIN_HTML = """
 <!doctype html>
-<html lang="ro">
+<html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -601,37 +605,37 @@ ADMIN_HTML = """
   <header>
     <div>
       <h1>Catalog Admin</h1>
-      <p>Generează broșuri HTML din imaginile încărcate.</p>
+      <p>Generate HTML brochures from uploaded images.</p>
     </div>
     <a href="/catalog-admin/logout/">Logout</a>
   </header>
 
   <main>
     <section>
-      <h2>Broșură nouă</h2>
+      <h2>New Brochure</h2>
       <form id="createForm">
         <input type="hidden" name="csrfmiddlewaretoken" value="{csrf_token}">
         <div class="grid">
           <div>
-            <label for="productName">Nume produs</label>
+            <label for="productName">Product Name</label>
             <input id="productName" name="product_name" placeholder="Ex: Butchaxe" required>
           </div>
           <div>
-            <label for="countryCode">Țară</label>
+            <label for="countryCode">Country</label>
             <select id="countryCode" name="country_code" required>
               {countries_options}
             </select>
           </div>
         </div>
         <div class="drop">
-          <label for="pageFiles">Pagini broșură</label>
+          <label for="pageFiles">Brochure Pages</label>
           <input id="pageFiles" type="file" accept="image/*" multiple>
-          <p class="note">Selectează pozele pentru broșură. Trage thumbnail-urile ca să alegi ordinea finală.</p>
+          <p class="note">Select brochure images. Drag thumbnails to set the final order.</p>
         </div>
         <div class="thumbs" id="thumbs"></div>
         <div class="actions">
-          <button type="submit">Generează broșura</button>
-          <button class="secondary" type="button" id="clearButton">Curăță pozele</button>
+          <button type="submit">Generate Brochure</button>
+          <button class="secondary" type="button" id="clearButton">Clear Images</button>
           <span class="note" id="statusText"></span>
         </div>
       </form>
@@ -639,15 +643,15 @@ ADMIN_HTML = """
     </section>
 
     <section>
-      <h2>Broșuri existente</h2>
+      <h2>Existing Brochures</h2>
       <table>
         <thead>
           <tr>
-            <th>Produs</th>
-            <th>Țară</th>
-            <th>Pagini</th>
-            <th>Link curent</th>
-            <th>Link subdomeniu</th>
+            <th>Product</th>
+            <th>Country</th>
+            <th>Pages</th>
+            <th>Current Link</th>
+            <th>Subdomain Link</th>
           </tr>
         </thead>
         <tbody>
@@ -720,7 +724,7 @@ ADMIN_HTML = """
       selected.forEach((item) => URL.revokeObjectURL(item.url));
       const files = Array.from(fileInput.files).filter((file) => file.type.startsWith("image/"));
       selected = files.map((file) => ({{ file, url: URL.createObjectURL(file) }}));
-      statusText.textContent = `${{selected.length}} pagini selectate.`;
+      statusText.textContent = `${{selected.length}} pages selected.`;
       renderThumbs();
     }});
 
@@ -736,14 +740,14 @@ ADMIN_HTML = """
     form.addEventListener("submit", async (event) => {{
       event.preventDefault();
       if (!selected.length) {{
-        statusText.textContent = "Încarcă cel puțin o pagină.";
+        statusText.textContent = "Upload at least one page.";
         return;
       }}
       const formData = new FormData();
       formData.append("product_name", document.getElementById("productName").value);
       formData.append("country_code", document.getElementById("countryCode").value);
       selected.forEach((item) => formData.append("pages", item.file, item.file.name));
-      statusText.textContent = "Se generează...";
+      statusText.textContent = "Generating...";
       resultBox.classList.remove("is-visible");
 
       const response = await fetch("/catalog-admin/create/", {{
@@ -753,15 +757,15 @@ ADMIN_HTML = """
       }});
       const data = await response.json();
       if (!response.ok || !data.ok) {{
-        statusText.textContent = data.error || "Nu am putut genera broșura.";
+        statusText.textContent = data.error || "Could not generate the brochure.";
         return;
       }}
-      statusText.textContent = `Publicată cu ${{data.page_count}} pagini.`;
+      statusText.textContent = `Published with ${{data.page_count}} pages.`;
       resultBox.innerHTML = `
-        <strong>Broșura este gata.</strong><br>
-        Link curent: <a href="${{data.public_url}}" target="_blank" rel="noopener">${{data.public_url}}</a><br>
-        Link scurt pe storwyz: <a href="${{data.root_url}}" target="_blank" rel="noopener">${{data.root_url}}</a><br>
-        Link dorit după DNS: <a href="${{data.desired_url}}" target="_blank" rel="noopener">${{data.desired_url}}</a>
+        <strong>The brochure is ready.</strong><br>
+        Current link: <a href="${{data.public_url}}" target="_blank" rel="noopener">${{data.public_url}}</a><br>
+        Short Storwyz link: <a href="${{data.root_url}}" target="_blank" rel="noopener">${{data.root_url}}</a><br>
+        Target DNS link: <a href="${{data.desired_url}}" target="_blank" rel="noopener">${{data.desired_url}}</a>
       `;
       resultBox.classList.add("is-visible");
     }});
@@ -783,19 +787,19 @@ def _public_html(manifest):
     for page in pages:
         filename = page.get("filename", "")
         src = f"{settings.MEDIA_URL}catalog_brochures/{product_slug}/{country_code}/{filename}"
-        image_items.append({"src": src, "alt": f"{product_name} pagina {page.get('number', '')}"})
+        image_items.append({"src": src, "alt": f"{product_name} page {page.get('number', '')}"})
 
     pages_json = json.dumps(image_items, ensure_ascii=False)
     title = escape(product_name)
 
     return f"""
 <!doctype html>
-<html lang="ro">
+<html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{title} - Broșură</title>
-  <meta name="description" content="Broșură interactivă {title}.">
+  <title>{title} - Brochure</title>
+  <meta name="description" content="Interactive brochure {title}.">
   <style>
     :root {{ color-scheme: dark; --ink:#f5ead8; --muted:#cdbb9e; --line:rgba(245,234,216,.16); --accent:#e4c68f; --fit:contain; font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }}
     * {{ box-sizing:border-box; }}
@@ -840,7 +844,7 @@ def _public_html(manifest):
 </head>
 <body>
   <div class="app">
-    <header class="topbar"><div class="brand"><strong>{title}</strong><span>{escape(manifest.get("country_label") or country_code.upper())}</span></div><div class="controls"><button class="icon-button" id="prevButton" aria-label="Pagina anterioară"><svg viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"></path></svg></button><div class="counter" id="counter"></div><button class="icon-button" id="nextButton" aria-label="Pagina următoare"><svg viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"></path></svg></button><button class="icon-button" id="fitButton" aria-label="Schimbă încadrarea"><svg viewBox="0 0 24 24"><path d="M8 3H5a2 2 0 0 0-2 2v3"></path><path d="M16 3h3a2 2 0 0 1 2 2v3"></path><path d="M8 21H5a2 2 0 0 1-2-2v-3"></path><path d="M16 21h3a2 2 0 0 0 2-2v-3"></path></svg></button></div></header>
+    <header class="topbar"><div class="brand"><strong>{title}</strong><span>{escape(_country_label(country_code))}</span></div><div class="controls"><button class="icon-button" id="prevButton" aria-label="Previous page"><svg viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"></path></svg></button><div class="counter" id="counter"></div><button class="icon-button" id="nextButton" aria-label="Next page"><svg viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"></path></svg></button><button class="icon-button" id="fitButton" aria-label="Toggle image fit"><svg viewBox="0 0 24 24"><path d="M8 3H5a2 2 0 0 0-2 2v3"></path><path d="M16 3h3a2 2 0 0 1 2 2v3"></path><path d="M8 21H5a2 2 0 0 1-2-2v-3"></path><path d="M16 21h3a2 2 0 0 0 2-2v-3"></path></svg></button></div></header>
     <main class="stage"><section class="book-shell"><div class="book"><article class="page page-left" id="leftPage"></article><div class="spine"></div><article class="page page-right" id="rightPage"></article><div class="hit prev" id="prevHit"></div><div class="hit next" id="nextHit"></div><div class="flip-page" id="flipPage"></div></div></section></main>
     <nav class="filmstrip" id="filmstrip"></nav>
   </div>
@@ -856,7 +860,7 @@ def _public_html(manifest):
     function displaySpread(start) {{ const spreadStart = clampStart(start); if (isSinglePage()) {{ leftPage.innerHTML = ""; rightPage.innerHTML = pageTemplate(pages[spreadStart], spreadStart); }} else {{ leftPage.innerHTML = pageTemplate(pages[spreadStart], spreadStart); rightPage.innerHTML = pageTemplate(pages[spreadStart + 1], spreadStart + 1); }} }}
     function updateStatus(start) {{ const spreadStart = clampStart(start); if (isSinglePage()) {{ counter.textContent = `${{spreadStart + 1}} / ${{pages.length}}`; }} else {{ counter.textContent = `${{spreadStart + 1}}-${{Math.min(spreadStart + 2, pages.length)}} / ${{pages.length}}`; }} prevButton.disabled = spreadStart <= 0 || animating; nextButton.disabled = spreadStart + stepSize() >= pages.length || animating; renderFilmstrip(spreadStart); }}
     function render() {{ document.documentElement.style.setProperty("--fit", fitMode); current = clampStart(current); displaySpread(current); updateStatus(current); }}
-    function renderFilmstrip(active = current) {{ const activeStart = clampStart(active), activeEnd = activeStart + stepSize() - 1; filmstrip.innerHTML = pages.map((page, index) => `<button class="thumb ${{index >= activeStart && index <= activeEnd ? "is-active" : ""}}" data-page="${{index}}" aria-label="Pagina ${{index + 1}}"><img src="${{page.src}}" alt=""><span>${{index + 1}}</span></button>`).join(""); }}
+    function renderFilmstrip(active = current) {{ const activeStart = clampStart(active), activeEnd = activeStart + stepSize() - 1; filmstrip.innerHTML = pages.map((page, index) => `<button class="thumb ${{index >= activeStart && index <= activeEnd ? "is-active" : ""}}" data-page="${{index}}" aria-label="Page ${{index + 1}}"><img src="${{page.src}}" alt=""><span>${{index + 1}}</span></button>`).join(""); }}
     const buildFlipFace = (frontPage, frontIndex, backPage, backIndex) => `<div class="flip-face front">${{pageTemplate(frontPage, frontIndex)}}</div><div class="flip-face back">${{pageTemplate(backPage, backIndex)}}</div>`;
     function animateFlip(direction, target) {{
       animating = true;
