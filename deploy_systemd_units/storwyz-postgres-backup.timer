@@ -1,0 +1,11 @@
+[Unit]
+Description=Run Storwyz PostgreSQL backup daily
+
+[Timer]
+OnCalendar=*-*-* 02:30:00
+Persistent=true
+RandomizedDelaySec=20m
+Unit=storwyz-postgres-backup.service
+
+[Install]
+WantedBy=timers.target

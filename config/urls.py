@@ -12,11 +12,14 @@ from django.utils.html import escape
 import uuid
 
 from superchatsync.peeko_admin import peeko_admin_site
+from superchatsync.views_health import healthz, readyz
 from superchatsync.views_shortlinks import shortlink_redirect, shortlinks_dashboard
 
 
 
 urlpatterns = [
+    path("healthz/", healthz, name="healthz"),
+    path("readyz/", readyz, name="readyz"),
     path("r/<slug:code>/", shortlink_redirect, name="shortlink_redirect"),
     path("shortlinks/", shortlinks_dashboard, name="shortlinks_dashboard"),
     path("peeko-admin/", peeko_admin_site.urls),

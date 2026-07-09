@@ -10,12 +10,19 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv("/opt/superchat-ai-agent/.env")
 
 
-SECRET_KEY = os.getenv(
-    "DJANGO_SECRET_KEY",
-    "temporary-dev-secret-key-change-this-later"
-)
+def env_bool(name, default=False):
+    fallback = "true" if default else "false"
+    return os.getenv(name, fallback).strip().lower() in {"true", "1", "yes", "on"}
 
-DEBUG = os.getenv("DJANGO_DEBUG", "True").lower() in ("true", "1", "yes")
+
+DEBUG = env_bool("DJANGO_DEBUG", False)
+
+SECRET_KEY = os.getenv("DJANGO_SECRET_KEY")
+if not SECRET_KEY:
+    if DEBUG:
+        SECRET_KEY = "django-development-only-secret-key"
+    else:
+        raise RuntimeError("DJANGO_SECRET_KEY is required when DJANGO_DEBUG is false")
 
 ALLOWED_HOSTS = [
     "storwyz.com",
@@ -138,8 +145,15 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 # Pentru Cloudflare / Nginx HTTPS proxy
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
-SESSION_COOKIE_SECURE = not DEBUG
-CSRF_COOKIE_SECURE = not DEBUG
+SECURE_SSL_REDIRECT = env_bool("DJANGO_SECURE_SSL_REDIRECT", not DEBUG)
+SESSION_COOKIE_SECURE = env_bool("DJANGO_SESSION_COOKIE_SECURE", not DEBUG)
+CSRF_COOKIE_SECURE = env_bool("DJANGO_CSRF_COOKIE_SECURE", not DEBUG)
+SESSION_COOKIE_HTTPONLY = True
+SECURE_CONTENT_TYPE_NOSNIFF = True
+SECURE_REFERRER_POLICY = "same-origin"
+SECURE_HSTS_SECONDS = int(os.getenv("DJANGO_SECURE_HSTS_SECONDS", "3600" if not DEBUG else "0"))
+SECURE_HSTS_INCLUDE_SUBDOMAINS = env_bool("DJANGO_SECURE_HSTS_INCLUDE_SUBDOMAINS", False)
+SECURE_HSTS_PRELOAD = env_bool("DJANGO_SECURE_HSTS_PRELOAD", False)
 
 X_FRAME_OPTIONS = "DENY"
 
