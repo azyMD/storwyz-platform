@@ -12,6 +12,7 @@ Purpose:
 - Upload page/product images through a simple admin UI.
 - Serve product/country catalog pages under Storwyz/Catalog routes.
 - Catalog brochures no longer enforce a fixed page-count limit; all uploaded valid images are kept.
+- Every product brochure stores and displays its product SKU in `manifest.json` and Catalog Admin.
 - Catalog admin and public viewer UI are in English.
 - Supported country codes include `cz` Czechia, `sk` Slovakia, `hr` Croatia and `tr` Turkey.
 
@@ -38,6 +39,9 @@ Storage:
 
 - Catalog files are stored under `MEDIA_ROOT/catalog_brochures`.
 - Generated media should not be committed to Git.
+- Existing brochure SKUs can be populated once from product knowledge with
+  `python manage.py backfill_catalog_product_skus --apply`; the command is idempotent,
+  skips ambiguous matches and backs up each changed manifest first.
 
 Security notes:
 

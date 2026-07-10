@@ -107,6 +107,7 @@ def _list_brochures():
         brochures.append(
             {
                 "product_name": manifest.get("product_name") or product_slug,
+                "product_sku": manifest.get("product_sku") or "",
                 "product_slug": product_slug,
                 "country_code": country_code,
                 "country_label": _country_label(country_code),
@@ -135,6 +136,7 @@ def catalog_admin(request):
         f"""
         <tr>
           <td><strong>{escape(item["product_name"])}</strong><span>{escape(item["product_slug"])}</span></td>
+          <td>{escape(item["product_sku"]) or '<span>Not set</span>'}</td>
           <td>{escape(item["country_label"])} <code>{escape(item["country_code"])}</code></td>
           <td>{escape(str(item["page_count"]))}</td>
           <td><a href="{escape(item["local_path"])}" target="_blank" rel="noopener">storwyz</a></td>
@@ -142,7 +144,7 @@ def catalog_admin(request):
         </tr>
         """
         for item in brochures
-    ) or '<tr><td colspan="5" class="empty">No brochures yet.</td></tr>'
+    ) or '<tr><td colspan="6" class="empty">No brochures yet.</td></tr>'
 
     return HttpResponse(
         ADMIN_HTML.format(
@@ -175,11 +177,19 @@ def catalog_create(request):
         return JsonResponse({"ok": False, "error": "Unauthorized"}, status=401)
 
     product_name = (request.POST.get("product_name") or "").strip()
+    product_sku = (request.POST.get("product_sku") or "").strip()
     country_code = (request.POST.get("country_code") or "").strip().lower()
     files = request.FILES.getlist("pages")
 
     if not product_name:
         return JsonResponse({"ok": False, "error": "Enter the product name."}, status=400)
+    if not product_sku:
+        return JsonResponse({"ok": False, "error": "Enter the product SKU."}, status=400)
+    if len(product_sku) > 120 or not re.fullmatch(r"[A-Za-z0-9._-]+", product_sku):
+        return JsonResponse(
+            {"ok": False, "error": "Use only letters, numbers, dots, underscores or hyphens in the SKU."},
+            status=400,
+        )
     if country_code not in dict(COUNTRIES):
         return JsonResponse({"ok": False, "error": "Choose a valid country."}, status=400)
     if not files:
@@ -218,6 +228,7 @@ def catalog_create(request):
         now = datetime.utcnow().replace(microsecond=0).isoformat() + "Z"
         manifest = {
             "product_name": product_name,
+            "product_sku": product_sku,
             "product_slug": product_slug,
             "country_code": country_code,
             "country_label": _country_label(country_code),
@@ -237,6 +248,7 @@ def catalog_create(request):
     return JsonResponse(
         {
             "ok": True,
+            "product_sku": product_sku,
             "product_slug": product_slug,
             "country_code": country_code,
             "page_count": len(pages),
@@ -621,6 +633,10 @@ ADMIN_HTML = """
             <input id="productName" name="product_name" placeholder="Ex: Butchaxe" required>
           </div>
           <div>
+            <label for="productSku">Product SKU</label>
+            <input id="productSku" name="product_sku" placeholder="Ex: 2757" maxlength="120" required>
+          </div>
+          <div>
             <label for="countryCode">Country</label>
             <select id="countryCode" name="country_code" required>
               {countries_options}
@@ -648,6 +664,7 @@ ADMIN_HTML = """
         <thead>
           <tr>
             <th>Product</th>
+            <th>SKU</th>
             <th>Country</th>
             <th>Pages</th>
             <th>Current Link</th>
@@ -745,6 +762,7 @@ ADMIN_HTML = """
       }}
       const formData = new FormData();
       formData.append("product_name", document.getElementById("productName").value);
+      formData.append("product_sku", document.getElementById("productSku").value);
       formData.append("country_code", document.getElementById("countryCode").value);
       selected.forEach((item) => formData.append("pages", item.file, item.file.name));
       statusText.textContent = "Generating...";
