@@ -39,8 +39,9 @@ Storage:
 
 - Catalog files are stored under `MEDIA_ROOT/catalog_brochures`.
 - Generated media should not be committed to Git.
-- Existing brochure SKUs can be populated once from product knowledge with
-  `python manage.py backfill_catalog_product_skus --apply`; the command is idempotent,
+- Existing brochure SKUs can be populated once from product knowledge on the server with
+  `sudo -u nobel /opt/superchat-ai-agent/venv/bin/python manage.py backfill_catalog_product_skus --apply`;
+  the command is idempotent,
   skips ambiguous matches and backs up each changed manifest first.
 
 Security notes:
