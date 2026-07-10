@@ -1,6 +1,6 @@
 # Catalog And Shortlinks
 
-Last updated: 2026-07-08
+Last updated: 2026-07-10
 
 These are separate functional modules inside `storwyz-platform`, not separate repositories.
 
@@ -44,6 +44,9 @@ Security notes:
 - `CATALOG_ADMIN_USER` and `CATALOG_ADMIN_PASSWORD` are environment variables.
 - The GitHub snapshot removed the old hardcoded password fallback.
 - If `CATALOG_ADMIN_PASSWORD` is not set, catalog login should not accept any password.
+- On 2026-07-10, the live catalog credentials were rotated in `/opt/superchat-ai-agent/.env`; secret values are intentionally not stored in Git.
+- A timestamped copy of the previous environment file was written under `/opt/superchat-ai-agent/backups/` before the rotation.
+- `superchat-web.service` was restarted and the catalog login redirect plus session flag were verified successfully.
 
 Related chat/work:
 
