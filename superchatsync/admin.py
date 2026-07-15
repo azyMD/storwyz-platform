@@ -5878,6 +5878,7 @@ from .models import (
     BusinessProduct,
     BusinessProductRanking,
     KnowledgeCenterLink,
+    LandingLeadSubmission,
     ShortLink,
     ShortLinkClick,
     WhatsappAgentInboxRoute,
@@ -6584,3 +6585,37 @@ class BusinessMediaAssetAdmin(admin.ModelAdmin):
     @admin.action(description="Reject selected media assets")
     def reject_assets(self, request, queryset):
         queryset.update(status="rejected")
+
+
+@admin.register(LandingLeadSubmission)
+class LandingLeadSubmissionAdmin(admin.ModelAdmin):
+    list_display = (
+        "received_at",
+        "customer_name",
+        "customer_phone",
+        "product",
+        "quantity",
+        "cost",
+        "status",
+        "upstream_http_status",
+        "external_order_id",
+    )
+    list_filter = ("status", "customer_region", "received_at")
+    search_fields = (
+        "customer_name",
+        "customer_phone",
+        "product",
+        "external_order_id",
+        "customer_comment",
+    )
+    readonly_fields = (
+        "lead_id",
+        "received_at",
+        "updated_at",
+        "sent_at",
+        "request_payload",
+        "forwarded_payload",
+        "validation_errors",
+        "upstream_response",
+    )
+    ordering = ("-received_at",)

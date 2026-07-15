@@ -1744,3 +1744,59 @@ class AiDecisionRoadmap(AiResponseProcessRun):
         proxy = True
         verbose_name = "AI Decision Roadmap"
         verbose_name_plural = "AI Decision Roadmap"
+
+
+class LandingLeadSubmission(models.Model):
+    STATUS_RECEIVED = "received"
+    STATUS_SENT = "sent"
+    STATUS_FAILED = "failed"
+    STATUS_VALIDATION_FAILED = "validation_failed"
+    STATUS_CHOICES = [
+        (STATUS_RECEIVED, "Received"),
+        (STATUS_SENT, "Sent"),
+        (STATUS_FAILED, "Failed"),
+        (STATUS_VALIDATION_FAILED, "Validation failed"),
+    ]
+
+    lead_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    status = models.CharField(max_length=32, choices=STATUS_CHOICES, default=STATUS_RECEIVED, db_index=True)
+
+    customer_name = models.TextField(blank=True, null=True)
+    customer_phone = models.TextField(blank=True, null=True, db_index=True)
+    customer_region = models.PositiveIntegerField(blank=True, null=True, db_index=True)
+    customer_address = models.TextField(blank=True, null=True)
+    quantity = models.PositiveIntegerField(blank=True, null=True)
+    cost = models.DecimalField(max_digits=12, decimal_places=2, blank=True, null=True)
+    product = models.TextField(blank=True, null=True, db_index=True)
+    referral = models.TextField(blank=True, null=True)
+    customer_comment = models.TextField(blank=True, null=True)
+
+    request_payload = models.JSONField(default=dict, blank=True)
+    forwarded_payload = models.JSONField(default=dict, blank=True)
+    validation_errors = models.JSONField(default=dict, blank=True)
+
+    forward_url = models.TextField(blank=True, null=True)
+    upstream_http_status = models.PositiveIntegerField(blank=True, null=True)
+    upstream_response = models.TextField(blank=True, null=True)
+    external_order_id = models.TextField(blank=True, null=True, db_index=True)
+    error = models.TextField(blank=True, null=True)
+
+    source_ip = models.GenericIPAddressField(blank=True, null=True)
+    user_agent = models.TextField(blank=True, null=True)
+    origin = models.TextField(blank=True, null=True)
+    received_at = models.DateTimeField(default=timezone.now, db_index=True)
+    sent_at = models.DateTimeField(blank=True, null=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "landing_lead_submissions"
+        verbose_name = "Landing Lead Submission"
+        verbose_name_plural = "Landing Lead Submissions"
+        ordering = ["-received_at"]
+        indexes = [
+            models.Index(fields=["status", "received_at"], name="landlead_status_time_idx"),
+            models.Index(fields=["product", "received_at"], name="landlead_product_time_idx"),
+        ]
+
+    def __str__(self):
+        return f"{self.received_at} | {self.customer_phone or '-'} | {self.status}"

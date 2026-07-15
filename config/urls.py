@@ -12,6 +12,13 @@ from django.utils.html import escape
 import uuid
 
 from superchatsync.peeko_admin import peeko_admin_site
+from superchatsync.landing_leads import (
+    landing_lead_api,
+    landing_lead_detail,
+    landing_leads_dashboard,
+    landing_leads_login,
+    landing_leads_logout,
+)
 from superchatsync.views_health import healthz, readyz
 from superchatsync.views_shortlinks import shortlink_redirect, shortlinks_dashboard
 
@@ -22,6 +29,11 @@ urlpatterns = [
     path("readyz/", readyz, name="readyz"),
     path("r/<slug:code>/", shortlink_redirect, name="shortlink_redirect"),
     path("shortlinks/", shortlinks_dashboard, name="shortlinks_dashboard"),
+    path("api/landing-leads/", landing_lead_api, name="landing_lead_api"),
+    path("landing-leads/", landing_leads_dashboard, name="landing_leads_dashboard"),
+    path("landing-leads/login/", landing_leads_login, name="landing_leads_login"),
+    path("landing-leads/logout/", landing_leads_logout, name="landing_leads_logout"),
+    path("landing-leads/<uuid:lead_id>/", landing_lead_detail, name="landing_lead_detail"),
     path("peeko-admin/", peeko_admin_site.urls),
     path("admin/", admin.site.urls),
 ]

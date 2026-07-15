@@ -63,6 +63,7 @@ Active WhatsApp agent routes:
 - [06-todo-risks-decisions.md](06-todo-risks-decisions.md) - next work, risks, open decisions.
 - [07-catalog-and-shortlinks.md](07-catalog-and-shortlinks.md) - catalog brochure builder and shortlink click tracking modules.
 - [08-production-hardening.md](08-production-hardening.md) - production security, health checks, backups and remaining controlled cutovers.
+- [09-landing-lead-api.md](09-landing-lead-api.md) - public landing lead receiver, Fitspace forwarding and delivery dashboard.
 
 ## How To Use This Pack
 

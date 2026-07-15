@@ -8,6 +8,7 @@ from django.test import RequestFactory
 from django.test import SimpleTestCase
 
 from superchatsync import catalog_builder
+from superchatsync.landing_leads import _external_order_id, validate_landing_lead
 from superchatsync.management.commands.backfill_catalog_product_skus import ProductSkuResolver
 
 
@@ -69,3 +70,45 @@ class CatalogSkuTests(SimpleTestCase):
             manifest_path = Path(temp_dir) / "butchaxe-ro" / "ro" / "manifest.json"
             manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
             self.assertEqual(manifest["product_sku"], "2757")
+
+
+class LandingLeadValidationTests(SimpleTestCase):
+    def test_valid_payload_is_normalized_for_fitspace(self):
+        payload, errors = validate_landing_lead(
+            {
+                "customer_name": "Test Customer",
+                "customer_phone": "+373 68 200 969",
+                "customer_region": "1044",
+                "customer_address": "Test street 10",
+                "quantity": "2",
+                "cost": "258.00",
+                "product": "2757",
+                "referral": "Landing",
+                "customer_comment": "Landing test",
+            }
+        )
+
+        self.assertEqual(errors, {})
+        self.assertEqual(payload["customer_region"], 1044)
+        self.assertEqual(payload["quantity"], 2)
+        self.assertEqual(payload["cost"], 258)
+        self.assertEqual(payload["product"], "2757")
+
+    def test_missing_required_fields_are_reported(self):
+        _, errors = validate_landing_lead({"customer_name": "", "cost": "invalid"})
+
+        self.assertEqual(
+            set(errors),
+            {
+                "customer_name",
+                "customer_phone",
+                "customer_address",
+                "customer_region",
+                "quantity",
+                "cost",
+                "product",
+            },
+        )
+
+    def test_external_order_id_is_extracted_from_fitspace_response(self):
+        self.assertEqual(_external_order_id('{"order_id":"fs_123"}'), "fs_123")
