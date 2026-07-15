@@ -17,9 +17,10 @@ from django.shortcuts import get_object_or_404, redirect
 from django.utils import timezone
 from django.utils.html import escape
 from django.views.decorators.csrf import csrf_exempt
-from django.views.decorators.http import require_http_methods
+from django.views.decorators.http import require_http_methods, require_POST
 
-from superchatsync.models import LandingLeadSubmission
+from superchatsync.landing_product_mapping import normalize_product_name, resolve_landing_product
+from superchatsync.models import LandingLeadSubmission, LandingProductMapping
 
 
 LANDING_LEADS_SESSION_KEY = "landing_leads_dashboard_authenticated"
@@ -82,7 +83,7 @@ def validate_landing_lead(payload):
     if not customer_address:
         errors["customer_address"] = "Customer address is required."
     if not product:
-        errors["product"] = "Product SKU is required."
+        errors["product"] = "Product name is required."
 
     customer_region = _positive_integer(payload.get("customer_region"), "customer_region", errors)
     quantity = _positive_integer(payload.get("quantity"), "quantity", errors)
@@ -148,6 +149,79 @@ def _forward_timeout():
         return 20
 
 
+def _json_cost(value):
+    if value is None:
+        return None
+    decimal_value = Decimal(str(value))
+    return int(decimal_value) if decimal_value == decimal_value.to_integral() else float(decimal_value)
+
+
+def _fitspace_payload_for_lead(lead, sku):
+    return {
+        "customer_name": lead.customer_name or "",
+        "customer_phone": lead.customer_phone or "",
+        "customer_region": lead.customer_region,
+        "customer_address": lead.customer_address or "",
+        "quantity": lead.quantity,
+        "cost": _json_cost(lead.cost),
+        "product": str(sku),
+        "referral": lead.referral or "Landing",
+        "customer_comment": lead.customer_comment or "",
+    }
+
+
+def deliver_landing_lead(lead, mapping):
+    forwarded_payload = _fitspace_payload_for_lead(lead, mapping.sku)
+    forward_url = os.getenv("LANDING_LEAD_FORWARD_URL") or os.getenv("ORDER_WEBHOOK_URL") or FITSPACE_DEFAULT_URL
+    lead.product_mapping = mapping
+    lead.product_sku = mapping.sku
+    lead.product_normalized = mapping.normalized_name
+    lead.forwarded_payload = forwarded_payload
+    lead.forward_url = forward_url
+    lead.status = LandingLeadSubmission.STATUS_RECEIVED
+    lead.upstream_http_status = None
+    lead.upstream_response = None
+    lead.external_order_id = None
+    lead.error = None
+    lead.sent_at = None
+    try:
+        response = requests.post(
+            forward_url,
+            json=forwarded_payload,
+            headers={"Content-Type": "application/json", "Accept": "application/json"},
+            timeout=_forward_timeout(),
+        )
+        lead.upstream_http_status = response.status_code
+        lead.upstream_response = (response.text or "")[:MAX_UPSTREAM_RESPONSE_CHARS]
+        lead.external_order_id = _external_order_id(response.text) or None
+        if 200 <= response.status_code < 300:
+            lead.status = LandingLeadSubmission.STATUS_SENT
+            lead.sent_at = timezone.now()
+        else:
+            lead.status = LandingLeadSubmission.STATUS_FAILED
+            lead.error = f"Fitspace returned HTTP {response.status_code}."
+    except requests.RequestException as exc:
+        lead.status = LandingLeadSubmission.STATUS_FAILED
+        lead.error = _text(exc, 4000)
+    lead.save(
+        update_fields=[
+            "product_mapping",
+            "product_sku",
+            "product_normalized",
+            "forwarded_payload",
+            "forward_url",
+            "upstream_http_status",
+            "upstream_response",
+            "external_order_id",
+            "status",
+            "sent_at",
+            "error",
+            "updated_at",
+        ]
+    )
+    return lead
+
+
 def _cors(response):
     response["Access-Control-Allow-Origin"] = "*"
     response["Access-Control-Allow-Methods"] = "POST, OPTIONS"
@@ -170,25 +244,35 @@ def landing_lead_api(request):
         return _cors(JsonResponse({"ok": False, "error": "Request body is too large."}, status=413))
 
     payload, parse_errors = _request_payload(request)
-    forwarded_payload, validation_errors = validate_landing_lead(payload)
+    cleaned_payload, validation_errors = validate_landing_lead(payload)
     validation_errors.update(parse_errors)
+    product_name = cleaned_payload.get("product") or ""
+    if validation_errors:
+        mapping = None
+        normalized_product = normalize_product_name(product_name)
+    else:
+        mapping, normalized_product = resolve_landing_product(product_name)
+    initial_status = LandingLeadSubmission.STATUS_RECEIVED
+    if validation_errors:
+        initial_status = LandingLeadSubmission.STATUS_VALIDATION_FAILED
+    elif not mapping:
+        initial_status = LandingLeadSubmission.STATUS_MAPPING_REQUIRED
     lead = LandingLeadSubmission.objects.create(
-        status=(
-            LandingLeadSubmission.STATUS_VALIDATION_FAILED
-            if validation_errors
-            else LandingLeadSubmission.STATUS_RECEIVED
-        ),
-        customer_name=forwarded_payload.get("customer_name") or None,
-        customer_phone=forwarded_payload.get("customer_phone") or None,
-        customer_region=forwarded_payload.get("customer_region"),
-        customer_address=forwarded_payload.get("customer_address") or None,
-        quantity=forwarded_payload.get("quantity"),
-        cost=forwarded_payload.get("cost"),
-        product=forwarded_payload.get("product") or None,
-        referral=forwarded_payload.get("referral") or None,
-        customer_comment=forwarded_payload.get("customer_comment") or None,
+        status=initial_status,
+        customer_name=cleaned_payload.get("customer_name") or None,
+        customer_phone=cleaned_payload.get("customer_phone") or None,
+        customer_region=cleaned_payload.get("customer_region"),
+        customer_address=cleaned_payload.get("customer_address") or None,
+        quantity=cleaned_payload.get("quantity"),
+        cost=cleaned_payload.get("cost"),
+        product=product_name or None,
+        product_normalized=normalized_product or None,
+        product_sku=mapping.sku if mapping else None,
+        product_mapping=mapping,
+        referral=cleaned_payload.get("referral") or None,
+        customer_comment=cleaned_payload.get("customer_comment") or None,
         request_payload=payload,
-        forwarded_payload=forwarded_payload if not validation_errors else {},
+        forwarded_payload={},
         validation_errors=validation_errors,
         source_ip=_source_ip(request),
         user_agent=_text(request.META.get("HTTP_USER_AGENT"), 2000) or None,
@@ -208,39 +292,23 @@ def landing_lead_api(request):
             )
         )
 
-    forward_url = os.getenv("LANDING_LEAD_FORWARD_URL") or os.getenv("ORDER_WEBHOOK_URL") or FITSPACE_DEFAULT_URL
-    lead.forward_url = forward_url
-    try:
-        response = requests.post(
-            forward_url,
-            json=forwarded_payload,
-            headers={"Content-Type": "application/json", "Accept": "application/json"},
-            timeout=_forward_timeout(),
+    if not mapping:
+        return _cors(
+            JsonResponse(
+                {
+                    "ok": True,
+                    "accepted": True,
+                    "forwarded": False,
+                    "lead_id": str(lead.lead_id),
+                    "status": lead.status,
+                    "product_received": lead.product,
+                    "message": "Lead stored and waiting for a Product / SKU mapping.",
+                },
+                status=202,
+            )
         )
-        lead.upstream_http_status = response.status_code
-        lead.upstream_response = (response.text or "")[:MAX_UPSTREAM_RESPONSE_CHARS]
-        lead.external_order_id = _external_order_id(response.text) or None
-        if 200 <= response.status_code < 300:
-            lead.status = LandingLeadSubmission.STATUS_SENT
-            lead.sent_at = timezone.now()
-        else:
-            lead.status = LandingLeadSubmission.STATUS_FAILED
-            lead.error = f"Fitspace returned HTTP {response.status_code}."
-    except requests.RequestException as exc:
-        lead.status = LandingLeadSubmission.STATUS_FAILED
-        lead.error = _text(exc, 4000)
-    lead.save(
-        update_fields=[
-            "forward_url",
-            "upstream_http_status",
-            "upstream_response",
-            "external_order_id",
-            "status",
-            "sent_at",
-            "error",
-            "updated_at",
-        ]
-    )
+
+    deliver_landing_lead(lead, mapping)
 
     response_status = 201 if lead.status == LandingLeadSubmission.STATUS_SENT else 502
     return _cors(
@@ -249,6 +317,8 @@ def landing_lead_api(request):
                 "ok": lead.status == LandingLeadSubmission.STATUS_SENT,
                 "lead_id": str(lead.lead_id),
                 "status": lead.status,
+                "product_received": lead.product,
+                "product_sku": lead.product_sku,
                 "upstream_http_status": lead.upstream_http_status,
                 "external_order_id": lead.external_order_id,
             },
@@ -290,21 +360,21 @@ def _base_html(title, content, actions=""):
         :root {{ color-scheme:light; --bg:#f4f6f5; --panel:#fff; --ink:#17201d; --muted:#69746f; --line:#dce3df; --accent:#176b52; --danger:#a92f36; font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif; }}
         * {{ box-sizing:border-box; }} body {{ margin:0; color:var(--ink); background:var(--bg); }}
         header {{ min-height:68px; padding:14px clamp(16px,4vw,44px); display:flex; align-items:center; justify-content:space-between; gap:20px; color:#fff; background:#173f34; }}
-        header strong {{ font-size:20px; }} header span {{ color:#cce0d9; font-size:13px; }} header a {{ color:#fff; }}
+        header strong {{ font-size:20px; }} header span {{ color:#cce0d9; font-size:13px; }} header a {{ color:#fff; }} .nav {{ display:flex; align-items:center; gap:14px; flex-wrap:wrap; }} .nav a {{ text-decoration:none; }} .nav a.active {{ border-bottom:2px solid #fff; }}
         main {{ width:min(1440px,96vw); margin:22px auto 40px; }} h1 {{ margin:0; font-size:28px; letter-spacing:0; }} h2 {{ margin:0 0 14px; font-size:18px; }} p {{ color:var(--muted); }}
         .titlebar {{ display:flex; align-items:end; justify-content:space-between; gap:16px; margin-bottom:18px; flex-wrap:wrap; }}
         .panel {{ border:1px solid var(--line); border-radius:8px; background:var(--panel); box-shadow:0 8px 24px rgba(25,48,40,.05); }}
-        .stats {{ display:grid; grid-template-columns:repeat(4,minmax(150px,1fr)); gap:12px; margin-bottom:16px; }}
+        .stats {{ display:grid; grid-template-columns:repeat(5,minmax(140px,1fr)); gap:12px; margin-bottom:16px; }}
         .stat {{ padding:16px; }} .stat span {{ display:block; color:var(--muted); font-size:12px; text-transform:uppercase; }} .stat strong {{ display:block; margin-top:5px; font-size:26px; }}
         form.filters {{ padding:14px; display:flex; gap:10px; align-items:end; flex-wrap:wrap; margin-bottom:16px; }}
         label {{ display:block; color:var(--muted); font-size:12px; font-weight:700; }} input,select {{ width:100%; height:40px; margin-top:5px; padding:0 11px; border:1px solid var(--line); border-radius:7px; background:#fff; }}
         .grow {{ flex:1 1 320px; }} .field {{ min-width:190px; }} button,.button {{ min-height:40px; padding:0 14px; border:0; border-radius:7px; display:inline-flex; align-items:center; justify-content:center; color:#fff; background:var(--accent); font-weight:750; text-decoration:none; cursor:pointer; }}
         .button.secondary {{ color:var(--ink); background:#e8eeeb; }} .table-wrap {{ overflow:auto; }} table {{ width:100%; border-collapse:collapse; font-size:13px; }} th,td {{ padding:11px 12px; border-bottom:1px solid var(--line); text-align:left; vertical-align:top; }} th {{ color:var(--muted); background:#f8faf9; font-size:11px; text-transform:uppercase; white-space:nowrap; }} td {{ white-space:nowrap; }} td.wrap {{ min-width:220px; white-space:normal; }}
-        .status {{ padding:4px 8px; border-radius:999px; display:inline-block; font-size:11px; font-weight:800; }} .sent {{ color:#17603f; background:#dff4e9; }} .failed,.validation_failed {{ color:#8b252d; background:#fde7e8; }} .received {{ color:#72500a; background:#fff0c7; }}
+        .status {{ padding:4px 8px; border-radius:999px; display:inline-block; font-size:11px; font-weight:800; }} .sent {{ color:#17603f; background:#dff4e9; }} .failed,.validation_failed {{ color:#8b252d; background:#fde7e8; }} .received {{ color:#72500a; background:#fff0c7; }} .mapping_required {{ color:#70460a; background:#ffedbd; }}
         .pagination {{ padding:14px; display:flex; align-items:center; justify-content:space-between; gap:12px; }} code,pre {{ font-family:ui-monospace,SFMono-Regular,Menlo,monospace; }} pre {{ margin:0; padding:14px; overflow:auto; border:1px solid var(--line); border-radius:7px; background:#f7f9f8; white-space:pre-wrap; overflow-wrap:anywhere; }}
         .details {{ display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:1px; overflow:hidden; }} .detail {{ min-height:76px; padding:14px; background:#fff; border-bottom:1px solid var(--line); }} .detail span {{ display:block; color:var(--muted); font-size:11px; text-transform:uppercase; }} .detail strong {{ display:block; margin-top:5px; overflow-wrap:anywhere; }}
-        .stack {{ display:grid; gap:16px; }} .login {{ width:min(420px,92vw); margin:10vh auto; padding:24px; }} .error {{ color:var(--danger); }}
-        @media(max-width:850px) {{ .stats{{grid-template-columns:1fr 1fr}} .details{{grid-template-columns:1fr}} header{{align-items:flex-start;flex-direction:column}} }}
+        .stack {{ display:grid; gap:16px; }} .login {{ width:min(420px,92vw); margin:10vh auto; padding:24px; }} .error {{ color:var(--danger); }} .notice {{ padding:12px 14px; margin-bottom:16px; color:#17603f; background:#e2f4ea; border:1px solid #bddfca; border-radius:7px; }} .inline-form {{ display:inline; }} .inline-form button {{ min-height:32px; padding:0 10px; font-size:12px; }}
+        @media(max-width:1000px) {{ .stats{{grid-template-columns:repeat(2,1fr)}} .details{{grid-template-columns:1fr}} header{{align-items:flex-start;flex-direction:column}} }}
       </style>
     </head>
     <body>
@@ -312,6 +382,18 @@ def _base_html(title, content, actions=""):
       {content}
     </body>
     </html>
+    """
+
+
+def _dashboard_actions(active):
+    leads_class = "active" if active == "leads" else ""
+    products_class = "active" if active == "products" else ""
+    return f"""
+      <nav class="nav">
+        <a class="{leads_class}" href="/landing-leads/">Leads</a>
+        <a class="{products_class}" href="/landing-leads/products/">Product / SKU</a>
+        <a href="/landing-leads/logout/">Sign out</a>
+      </nav>
     """
 
 
@@ -378,12 +460,14 @@ def landing_leads_dashboard(request):
             Q(customer_name__icontains=query)
             | Q(customer_phone__icontains=query)
             | Q(product__icontains=query)
+            | Q(product_sku__icontains=query)
             | Q(external_order_id__icontains=query)
         )
 
     page = Paginator(queryset, 50).get_page(request.GET.get("page"))
     stats = LandingLeadSubmission.objects.aggregate(
         total=Count("lead_id"),
+        mapping=Count("lead_id", filter=Q(status=LandingLeadSubmission.STATUS_MAPPING_REQUIRED)),
         sent=Count("lead_id", filter=Q(status=LandingLeadSubmission.STATUS_SENT)),
         failed=Count("lead_id", filter=Q(status=LandingLeadSubmission.STATUS_FAILED)),
         invalid=Count("lead_id", filter=Q(status=LandingLeadSubmission.STATUS_VALIDATION_FAILED)),
@@ -398,7 +482,7 @@ def landing_leads_dashboard(request):
               <td><code>{escape(str(lead.lead_id)[:8])}</code></td>
               <td>{escape(received)}</td>
               <td class="wrap"><strong>{escape(lead.customer_name or '-')}</strong><br>{escape(lead.customer_phone or '-')}</td>
-              <td>{escape(lead.product or '-')}</td>
+              <td class="wrap"><strong>{escape(lead.product or '-')}</strong><br><span>SKU: {escape(lead.product_sku or '-')}</span></td>
               <td>{escape(str(lead.quantity or '-'))}</td>
               <td>{escape(str(lead.cost if lead.cost is not None else '-'))}</td>
               <td><span class="status {escape(lead.status)}">{escape(lead.get_status_display())}</span></td>
@@ -430,6 +514,7 @@ def landing_leads_dashboard(request):
         <div class="titlebar"><div><h1>Landing leads</h1><p>Fitspace delivery status for leads received from landing pages.</p></div><code>POST /api/landing-leads/</code></div>
         <section class="stats">
           <div class="panel stat"><span>Total</span><strong>{stats['total']}</strong></div>
+          <div class="panel stat"><span>Needs mapping</span><strong>{stats['mapping']}</strong></div>
           <div class="panel stat"><span>Sent</span><strong>{stats['sent']}</strong></div>
           <div class="panel stat"><span>Failed</span><strong>{stats['failed']}</strong></div>
           <div class="panel stat"><span>Invalid</span><strong>{stats['invalid']}</strong></div>
@@ -445,8 +530,177 @@ def landing_leads_dashboard(request):
       </main>
     """
     return _dashboard_response(
-        _base_html("Landing leads", content, '<a href="/landing-leads/logout/">Sign out</a>')
+        _base_html("Landing leads", content, _dashboard_actions("leads"))
     )
+
+
+@_dashboard_required
+@require_http_methods(["GET", "POST"])
+def landing_product_mappings(request):
+    error = ""
+    posted_product_name = ""
+    posted_sku = ""
+    posted_mapping_id = ""
+    posted_active = True
+    if request.method == "POST":
+        mapping_id = _text(request.POST.get("mapping_id"), 80)
+        product_name = _text(request.POST.get("product_name"), 300)
+        sku = _text(request.POST.get("sku"), 120)
+        active = request.POST.get("active") == "on"
+        posted_product_name = product_name
+        posted_sku = sku
+        posted_mapping_id = mapping_id
+        posted_active = active
+        normalized_name = normalize_product_name(product_name)
+        if not normalized_name:
+            error = "Enter a product name."
+        elif not sku:
+            error = "Enter the Fitspace SKU."
+        else:
+            duplicate = LandingProductMapping.objects.filter(normalized_name=normalized_name)
+            if mapping_id:
+                duplicate = duplicate.exclude(mapping_id=mapping_id)
+            if duplicate.exists():
+                error = "A mapping already exists for this normalized product name."
+            else:
+                if mapping_id:
+                    mapping = get_object_or_404(LandingProductMapping, mapping_id=mapping_id)
+                    mapping.product_name = product_name
+                    mapping.normalized_name = normalized_name
+                    mapping.sku = sku
+                    mapping.active = active
+                    mapping.source = LandingProductMapping.SOURCE_MANUAL
+                    mapping.save()
+                else:
+                    LandingProductMapping.objects.create(
+                        product_name=product_name,
+                        normalized_name=normalized_name,
+                        sku=sku,
+                        active=active,
+                        source=LandingProductMapping.SOURCE_MANUAL,
+                    )
+                return redirect("/landing-leads/products/?saved=1")
+
+    query = _text(request.GET.get("q"), 300)
+    mappings = LandingProductMapping.objects.all()
+    if query:
+        mappings = mappings.filter(
+            Q(product_name__icontains=query)
+            | Q(sku__icontains=query)
+            | Q(normalized_name__icontains=normalize_product_name(query))
+        )
+    page = Paginator(mappings, 100).get_page(request.GET.get("page"))
+    pending_counts = {
+        row["product_normalized"]: row["count"]
+        for row in LandingLeadSubmission.objects.filter(
+            status=LandingLeadSubmission.STATUS_MAPPING_REQUIRED
+        )
+        .values("product_normalized")
+        .annotate(count=Count("lead_id"))
+    }
+    edit_mapping = None
+    edit_id = _text(request.GET.get("edit"), 80)
+    if edit_id:
+        edit_mapping = LandingProductMapping.objects.filter(mapping_id=edit_id).first()
+
+    token = get_token(request)
+    rows = []
+    for mapping in page.object_list:
+        pending = pending_counts.get(mapping.normalized_name, 0)
+        send_action = "-"
+        if pending and mapping.active:
+            send_action = f"""
+              <form class="inline-form" method="post" action="/landing-leads/products/{escape(str(mapping.mapping_id))}/send-pending/">
+                <input type="hidden" name="csrfmiddlewaretoken" value="{escape(token)}">
+                <button type="submit">Send {pending} pending</button>
+              </form>
+            """
+        rows.append(
+            f"""
+            <tr>
+              <td class="wrap"><strong>{escape(mapping.product_name)}</strong><br><span>{escape(mapping.normalized_name)}</span></td>
+              <td><code>{escape(mapping.sku)}</code></td>
+              <td>{escape(mapping.get_source_display())}</td>
+              <td>{'Yes' if mapping.active else 'No'}</td>
+              <td>{pending}</td>
+              <td>{send_action}</td>
+              <td><a href="?edit={escape(str(mapping.mapping_id))}&q={escape(query)}">Edit</a></td>
+            </tr>
+            """
+        )
+    table_rows = "".join(rows) or '<tr><td colspan="7">No product mappings found.</td></tr>'
+    selected = edit_mapping
+    form_title = "Edit mapping" if selected else "Add mapping"
+    if request.method == "POST" and error:
+        form_product = posted_product_name
+        form_sku = posted_sku
+        form_id = posted_mapping_id
+        form_checked = " checked" if posted_active else ""
+        form_title = "Edit mapping" if posted_mapping_id else "Add mapping"
+    else:
+        form_product = selected.product_name if selected else ""
+        form_sku = selected.sku if selected else ""
+        form_id = str(selected.mapping_id) if selected else ""
+        form_checked = " checked" if selected is None or selected.active else ""
+    notice = ""
+    if request.GET.get("saved") == "1":
+        notice = '<div class="notice">Product mapping saved.</div>'
+    elif request.GET.get("sent"):
+        notice = f'<div class="notice">Processed {escape(request.GET.get("sent"))} pending leads.</div>'
+    previous_link = (
+        f'<a href="?page={page.previous_page_number()}&q={escape(query)}">Previous</a>'
+        if page.has_previous()
+        else ""
+    )
+    next_link = (
+        f'<a href="?page={page.next_page_number()}&q={escape(query)}">Next</a>'
+        if page.has_next()
+        else ""
+    )
+    content = f"""
+      <main>
+        <div class="titlebar"><div><h1>Product / SKU</h1><p>Exact product-name mapping used before Fitspace delivery.</p></div><strong>{page.paginator.count} mappings</strong></div>
+        {notice}
+        {'<div class="notice error">' + escape(error) + '</div>' if error else ''}
+        <section class="panel" style="padding:16px;margin-bottom:16px">
+          <h2>{form_title}</h2>
+          <form method="post" action="/landing-leads/products/" class="filters" style="padding:0;margin:0">
+            <input type="hidden" name="csrfmiddlewaretoken" value="{escape(token)}">
+            <input type="hidden" name="mapping_id" value="{escape(form_id)}">
+            <label class="grow">Product name<input name="product_name" value="{escape(form_product)}" required></label>
+            <label class="field">Fitspace SKU<input name="sku" value="{escape(form_sku)}" required></label>
+            <label class="field">Active<input type="checkbox" name="active"{form_checked} style="width:auto"></label>
+            <button type="submit">Save mapping</button>
+            {'<a class="button secondary" href="/landing-leads/products/">Cancel</a>' if selected else ''}
+          </form>
+        </section>
+        <form class="panel filters" method="get">
+          <label class="grow">Search<input name="q" value="{escape(query)}" placeholder="Product name or SKU"></label>
+          <button type="submit">Search</button><a class="button secondary" href="/landing-leads/products/">Reset</a>
+        </form>
+        <section class="panel table-wrap"><table><thead><tr><th>Product text</th><th>SKU</th><th>Source</th><th>Active</th><th>Pending</th><th></th><th></th></tr></thead><tbody>{table_rows}</tbody></table>
+          <div class="pagination"><span>{previous_link}</span><span>Page {page.number} of {page.paginator.num_pages}</span><span>{next_link}</span></div>
+        </section>
+      </main>
+    """
+    return _dashboard_response(
+        _base_html("Product / SKU", content, _dashboard_actions("products"))
+    )
+
+
+@require_POST
+@_dashboard_required
+def landing_product_mapping_send_pending(request, mapping_id):
+    mapping = get_object_or_404(LandingProductMapping, mapping_id=mapping_id, active=True)
+    pending_leads = list(
+        LandingLeadSubmission.objects.filter(
+            status=LandingLeadSubmission.STATUS_MAPPING_REQUIRED,
+            product_normalized=mapping.normalized_name,
+        ).order_by("received_at")[:100]
+    )
+    for lead in pending_leads:
+        deliver_landing_lead(lead, mapping)
+    return redirect(f"/landing-leads/products/?sent={len(pending_leads)}")
 
 
 @_dashboard_required
@@ -462,7 +716,8 @@ def landing_lead_detail(request, lead_id):
         ("Phone", lead.customer_phone or "-"),
         ("Region", lead.customer_region or "-"),
         ("Address", lead.customer_address or "-"),
-        ("Product SKU", lead.product or "-"),
+        ("Product received", lead.product or "-"),
+        ("Mapped SKU", lead.product_sku or "-"),
         ("Quantity", lead.quantity or "-"),
         ("Cost", lead.cost if lead.cost is not None else "-"),
         ("Referral", lead.referral or "-"),
@@ -491,5 +746,5 @@ def landing_lead_detail(request, lead_id):
       </main>
     """
     return _dashboard_response(
-        _base_html("Lead details", content, '<a href="/landing-leads/logout/">Sign out</a>')
+        _base_html("Lead details", content, _dashboard_actions("leads"))
     )

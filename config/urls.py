@@ -18,6 +18,8 @@ from superchatsync.landing_leads import (
     landing_leads_dashboard,
     landing_leads_login,
     landing_leads_logout,
+    landing_product_mapping_send_pending,
+    landing_product_mappings,
 )
 from superchatsync.views_health import healthz, readyz
 from superchatsync.views_shortlinks import shortlink_redirect, shortlinks_dashboard
@@ -33,6 +35,12 @@ urlpatterns = [
     path("landing-leads/", landing_leads_dashboard, name="landing_leads_dashboard"),
     path("landing-leads/login/", landing_leads_login, name="landing_leads_login"),
     path("landing-leads/logout/", landing_leads_logout, name="landing_leads_logout"),
+    path("landing-leads/products/", landing_product_mappings, name="landing_product_mappings"),
+    path(
+        "landing-leads/products/<uuid:mapping_id>/send-pending/",
+        landing_product_mapping_send_pending,
+        name="landing_product_mapping_send_pending",
+    ),
     path("landing-leads/<uuid:lead_id>/", landing_lead_detail, name="landing_lead_detail"),
     path("peeko-admin/", peeko_admin_site.urls),
     path("admin/", admin.site.urls),

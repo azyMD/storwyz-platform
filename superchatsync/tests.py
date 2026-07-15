@@ -1,15 +1,22 @@
 import json
+from decimal import Decimal
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from types import SimpleNamespace
 from unittest.mock import patch
 
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.test import RequestFactory
-from django.test import SimpleTestCase
+from django.test import RequestFactory, SimpleTestCase, TestCase
 
 from superchatsync import catalog_builder
-from superchatsync.landing_leads import _external_order_id, validate_landing_lead
+from superchatsync.landing_leads import (
+    _external_order_id,
+    _fitspace_payload_for_lead,
+    validate_landing_lead,
+)
+from superchatsync.landing_product_mapping import normalize_product_name
 from superchatsync.management.commands.backfill_catalog_product_skus import ProductSkuResolver
+from superchatsync.models import LandingLeadSubmission, LandingProductMapping
 
 
 class HealthEndpointTests(SimpleTestCase):
@@ -82,7 +89,7 @@ class LandingLeadValidationTests(SimpleTestCase):
                 "customer_address": "Test street 10",
                 "quantity": "2",
                 "cost": "258.00",
-                "product": "2757",
+                "product": "ButchAxe",
                 "referral": "Landing",
                 "customer_comment": "Landing test",
             }
@@ -92,7 +99,7 @@ class LandingLeadValidationTests(SimpleTestCase):
         self.assertEqual(payload["customer_region"], 1044)
         self.assertEqual(payload["quantity"], 2)
         self.assertEqual(payload["cost"], 258)
-        self.assertEqual(payload["product"], "2757")
+        self.assertEqual(payload["product"], "ButchAxe")
 
     def test_missing_required_fields_are_reported(self):
         _, errors = validate_landing_lead({"customer_name": "", "cost": "invalid"})
@@ -112,3 +119,75 @@ class LandingLeadValidationTests(SimpleTestCase):
 
     def test_external_order_id_is_extracted_from_fitspace_response(self):
         self.assertEqual(_external_order_id('{"order_id":"fs_123"}'), "fs_123")
+
+    def test_product_name_normalization_is_exact_but_format_tolerant(self):
+        self.assertEqual(normalize_product_name("  Butch-Axe™  "), "butchaxe")
+        self.assertEqual(normalize_product_name("Cuțit Japonez"), "cutitjaponez")
+
+    def test_fitspace_payload_uses_resolved_sku(self):
+        lead = SimpleNamespace(
+            customer_name="Test Customer",
+            customer_phone="+37368000000",
+            customer_region=1044,
+            customer_address="Test address",
+            quantity=1,
+            cost=Decimal("129.00"),
+            referral="Landing",
+            customer_comment="Test",
+        )
+
+        payload = _fitspace_payload_for_lead(lead, "2757")
+
+        self.assertEqual(payload["product"], "2757")
+        self.assertEqual(payload["cost"], 129)
+
+
+class LandingLeadProductMappingTests(TestCase):
+    payload = {
+        "customer_name": "Test Customer",
+        "customer_phone": "+37368000000",
+        "customer_region": 1044,
+        "customer_address": "Test street 10",
+        "quantity": 1,
+        "cost": 129,
+        "product": "Butch Axe",
+        "referral": "Landing",
+        "customer_comment": "Mapping test",
+    }
+
+    @patch("superchatsync.landing_leads.requests.post")
+    def test_known_product_is_forwarded_with_mapped_sku(self, post):
+        LandingProductMapping.objects.create(product_name="ButchAxe", sku="2757")
+        post.return_value = SimpleNamespace(status_code=201, text='{"order_id":"fs_test"}')
+
+        response = self.client.post(
+            "/api/landing-leads/",
+            data=json.dumps(self.payload),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.json()["product_sku"], "2757")
+        self.assertEqual(post.call_args.kwargs["json"]["product"], "2757")
+        lead = LandingLeadSubmission.objects.get()
+        self.assertEqual(lead.product, "Butch Axe")
+        self.assertEqual(lead.product_sku, "2757")
+        self.assertEqual(lead.status, LandingLeadSubmission.STATUS_SENT)
+
+    @patch("superchatsync.landing_leads.requests.post")
+    def test_unknown_product_is_stored_without_forwarding(self, post):
+        payload = {**self.payload, "product": "Unknown landing product"}
+
+        response = self.client.post(
+            "/api/landing-leads/",
+            data=json.dumps(payload),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 202)
+        self.assertFalse(response.json()["forwarded"])
+        post.assert_not_called()
+        lead = LandingLeadSubmission.objects.get()
+        self.assertEqual(lead.product, "Unknown landing product")
+        self.assertEqual(lead.status, LandingLeadSubmission.STATUS_MAPPING_REQUIRED)
+        self.assertFalse(lead.product_sku)

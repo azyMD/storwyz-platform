@@ -5879,6 +5879,7 @@ from .models import (
     BusinessProductRanking,
     KnowledgeCenterLink,
     LandingLeadSubmission,
+    LandingProductMapping,
     ShortLink,
     ShortLinkClick,
     WhatsappAgentInboxRoute,
@@ -6594,6 +6595,7 @@ class LandingLeadSubmissionAdmin(admin.ModelAdmin):
         "customer_name",
         "customer_phone",
         "product",
+        "product_sku",
         "quantity",
         "cost",
         "status",
@@ -6605,6 +6607,7 @@ class LandingLeadSubmissionAdmin(admin.ModelAdmin):
         "customer_name",
         "customer_phone",
         "product",
+        "product_sku",
         "external_order_id",
         "customer_comment",
     )
@@ -6619,3 +6622,12 @@ class LandingLeadSubmissionAdmin(admin.ModelAdmin):
         "upstream_response",
     )
     ordering = ("-received_at",)
+
+
+@admin.register(LandingProductMapping)
+class LandingProductMappingAdmin(admin.ModelAdmin):
+    list_display = ("product_name", "sku", "source", "active", "updated_at")
+    list_filter = ("source", "active")
+    search_fields = ("product_name", "normalized_name", "sku")
+    readonly_fields = ("mapping_id", "normalized_name", "created_at", "updated_at")
+    ordering = ("product_name",)

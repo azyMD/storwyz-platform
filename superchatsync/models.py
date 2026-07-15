@@ -1748,11 +1748,13 @@ class AiDecisionRoadmap(AiResponseProcessRun):
 
 class LandingLeadSubmission(models.Model):
     STATUS_RECEIVED = "received"
+    STATUS_MAPPING_REQUIRED = "mapping_required"
     STATUS_SENT = "sent"
     STATUS_FAILED = "failed"
     STATUS_VALIDATION_FAILED = "validation_failed"
     STATUS_CHOICES = [
         (STATUS_RECEIVED, "Received"),
+        (STATUS_MAPPING_REQUIRED, "Mapping required"),
         (STATUS_SENT, "Sent"),
         (STATUS_FAILED, "Failed"),
         (STATUS_VALIDATION_FAILED, "Validation failed"),
@@ -1768,6 +1770,15 @@ class LandingLeadSubmission(models.Model):
     quantity = models.PositiveIntegerField(blank=True, null=True)
     cost = models.DecimalField(max_digits=12, decimal_places=2, blank=True, null=True)
     product = models.TextField(blank=True, null=True, db_index=True)
+    product_normalized = models.TextField(blank=True, null=True, db_index=True)
+    product_sku = models.TextField(blank=True, null=True, db_index=True)
+    product_mapping = models.ForeignKey(
+        "LandingProductMapping",
+        on_delete=models.SET_NULL,
+        blank=True,
+        null=True,
+        related_name="leads",
+    )
     referral = models.TextField(blank=True, null=True)
     customer_comment = models.TextField(blank=True, null=True)
 
@@ -1800,3 +1811,41 @@ class LandingLeadSubmission(models.Model):
 
     def __str__(self):
         return f"{self.received_at} | {self.customer_phone or '-'} | {self.status}"
+
+
+class LandingProductMapping(models.Model):
+    SOURCE_PRODUCT_KNOWLEDGE = "product_knowledge"
+    SOURCE_PRODUCT_ALIAS = "product_alias"
+    SOURCE_MANUAL = "manual"
+    SOURCE_CHOICES = [
+        (SOURCE_PRODUCT_KNOWLEDGE, "Product knowledge"),
+        (SOURCE_PRODUCT_ALIAS, "Product alias"),
+        (SOURCE_MANUAL, "Manual"),
+    ]
+
+    mapping_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    product_name = models.TextField()
+    normalized_name = models.TextField(unique=True, db_index=True)
+    sku = models.TextField(db_index=True)
+    source = models.CharField(max_length=40, choices=SOURCE_CHOICES, default=SOURCE_MANUAL)
+    active = models.BooleanField(default=True, db_index=True)
+    created_at = models.DateTimeField(default=timezone.now)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "landing_product_mappings"
+        verbose_name = "Landing Product Mapping"
+        verbose_name_plural = "Landing Product Mappings"
+        ordering = ["product_name"]
+        indexes = [
+            models.Index(fields=["active", "product_name"], name="landprod_active_name_idx"),
+        ]
+
+    def __str__(self):
+        return f"{self.product_name} -> {self.sku}"
+
+    def save(self, *args, **kwargs):
+        from superchatsync.landing_product_mapping import normalize_product_name
+
+        self.normalized_name = normalize_product_name(self.product_name)
+        super().save(*args, **kwargs)
