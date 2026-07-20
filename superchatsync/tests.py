@@ -78,6 +78,30 @@ class CatalogSkuTests(SimpleTestCase):
             manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
             self.assertEqual(manifest["product_sku"], "2757")
 
+    def test_delete_removes_catalog_directory(self):
+        with TemporaryDirectory() as temp_dir:
+            catalog_path = Path(temp_dir) / "butchaxe-ro" / "ro"
+            catalog_path.mkdir(parents=True)
+            (catalog_path / "manifest.json").write_text(
+                json.dumps(
+                    {
+                        "product_name": "ButchAxe RO",
+                        "product_slug": "butchaxe-ro",
+                        "country_code": "ro",
+                        "pages": [{"filename": "assets/page-01.png"}],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            request = RequestFactory().post("/catalog-admin/delete/butchaxe-ro/ro/")
+            request.session = {catalog_builder.CATALOG_SESSION_KEY: True}
+
+            with patch.object(catalog_builder, "CATALOG_DIR", Path(temp_dir)):
+                response = catalog_builder.catalog_delete(request, "butchaxe-ro", "ro")
+
+            self.assertEqual(response.status_code, 302)
+            self.assertFalse(catalog_path.exists())
+
 
 class LandingLeadValidationTests(SimpleTestCase):
     def test_valid_payload_is_normalized_for_fitspace(self):

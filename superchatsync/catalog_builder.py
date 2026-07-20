@@ -141,10 +141,16 @@ def catalog_admin(request):
           <td>{escape(str(item["page_count"]))}</td>
           <td><a href="{escape(item["local_path"])}" target="_blank" rel="noopener">storwyz</a></td>
           <td><a href="{escape(item["desired_url"])}" target="_blank" rel="noopener">catalog</a></td>
+          <td>
+            <form class="inline-form" method="post" action="{escape(reverse("catalog_delete", args=[item["product_slug"], item["country_code"]]))}" onsubmit="return confirm('Delete this catalog? This cannot be undone.');">
+              <input type="hidden" name="csrfmiddlewaretoken" value="{escape(token)}">
+              <button class="danger" type="submit">Delete</button>
+            </form>
+          </td>
         </tr>
         """
         for item in brochures
-    ) or '<tr><td colspan="6" class="empty">No brochures yet.</td></tr>'
+    ) or '<tr><td colspan="7" class="empty">No brochures yet.</td></tr>'
 
     return HttpResponse(
         ADMIN_HTML.format(
@@ -257,6 +263,17 @@ def catalog_create(request):
             "desired_url": _desired_catalog_url(product_slug, country_code),
         }
     )
+
+
+@require_POST
+def catalog_delete(request, product_slug, country_code):
+    if not _is_admin(request):
+        return redirect("catalog_admin")
+
+    _read_manifest(product_slug, country_code)
+    target = _safe_catalog_path(product_slug, country_code)
+    shutil.rmtree(target)
+    return redirect("catalog_admin")
 
 
 def catalog_public(request, product_slug, country_code):
@@ -588,6 +605,8 @@ ADMIN_HTML = """
       cursor: pointer;
     }}
     button.secondary {{ color: var(--dark); background: #eadfd2; }}
+    button.danger {{ height: 34px; color: #8f1d1d; background: #f8dddd; }}
+    .inline-form {{ margin: 0; }}
     .note {{ color: var(--muted); font-size: 13px; }}
     .result {{
       display: none;

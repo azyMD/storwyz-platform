@@ -510,6 +510,7 @@ urlpatterns += [
 from superchatsync.catalog_builder import (
     catalog_admin,
     catalog_create,
+    catalog_delete,
     catalog_login,
     catalog_logout,
     catalog_public,
@@ -521,6 +522,11 @@ urlpatterns += [
     path("catalog-admin/login/", catalog_login, name="catalog_login"),
     path("catalog-admin/logout/", catalog_logout, name="catalog_logout"),
     path("catalog-admin/create/", catalog_create, name="catalog_create"),
+    path(
+        "catalog-admin/delete/<slug:product_slug>/<slug:country_code>/",
+        catalog_delete,
+        name="catalog_delete",
+    ),
     path("catalog/<slug:product_slug>/<slug:country_code>/", catalog_public, name="catalog_public"),
     path("<slug:product_slug>/<slug:country_code>/", catalog_public_root, name="catalog_public_root"),
 ]
