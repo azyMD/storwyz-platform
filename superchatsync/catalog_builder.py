@@ -733,10 +733,67 @@ ADMIN_HTML = """
     const catalogFilters = document.getElementById("catalogFilters");
     const catalogResultCount = document.getElementById("catalogResultCount");
     const catalogRows = Array.from(document.querySelectorAll("#catalogTable tbody tr")).filter((row) => !row.classList.contains("empty"));
+    const catalogFilterStorageKey = "storwyz.catalogAdmin.filters";
+    const catalogFilterFields = {{
+      product: document.getElementById("catalogProductFilter"),
+      sku: document.getElementById("catalogSkuFilter"),
+      country: document.getElementById("catalogCountryFilter")
+    }};
     let selected = [];
 
     function normalizeFilterValue(value) {{
       return (value || "").toLowerCase().normalize("NFD").replace(/[\\u0300-\\u036f]/g, "").trim();
+    }}
+
+    function getCatalogFilterValues() {{
+      return {{
+        product: catalogFilterFields.product.value.trim(),
+        sku: catalogFilterFields.sku.value.trim(),
+        country: catalogFilterFields.country.value.trim()
+      }};
+    }}
+
+    function setCatalogFilterValues(values) {{
+      catalogFilterFields.product.value = values.product || "";
+      catalogFilterFields.sku.value = values.sku || "";
+      catalogFilterFields.country.value = values.country || "";
+    }}
+
+    function readStoredCatalogFilters() {{
+      try {{
+        return JSON.parse(localStorage.getItem(catalogFilterStorageKey) || "{{}}");
+      }} catch (error) {{
+        return {{}};
+      }}
+    }}
+
+    function syncCatalogFilterState(clear = false) {{
+      const url = new URL(window.location.href);
+      if (clear) {{
+        ["product", "sku", "country"].forEach((key) => url.searchParams.delete(key));
+        localStorage.removeItem(catalogFilterStorageKey);
+      }} else {{
+        const values = getCatalogFilterValues();
+        localStorage.setItem(catalogFilterStorageKey, JSON.stringify(values));
+        Object.entries(values).forEach(([key, value]) => {{
+          if (value) {{
+            url.searchParams.set(key, value);
+          }} else {{
+            url.searchParams.delete(key);
+          }}
+        }});
+      }}
+      window.history.replaceState(null, "", url);
+    }}
+
+    function restoreCatalogFilters() {{
+      const params = new URLSearchParams(window.location.search);
+      const stored = readStoredCatalogFilters();
+      setCatalogFilterValues({{
+        product: params.get("product") || stored.product || "",
+        sku: params.get("sku") || stored.sku || "",
+        country: params.get("country") || stored.country || ""
+      }});
     }}
 
     function applyCatalogFilters() {{
@@ -759,13 +816,17 @@ ADMIN_HTML = """
       catalogResultCount.textContent = `${{visible}} of ${{catalogRows.length}} brochures shown`;
     }}
 
-    catalogFilters.addEventListener("input", applyCatalogFilters);
-    document.getElementById("catalogResetFilters").addEventListener("click", () => {{
-      catalogFilters.querySelectorAll("input").forEach((input) => {{
-        input.value = "";
-      }});
+    catalogFilters.addEventListener("input", () => {{
+      syncCatalogFilterState();
       applyCatalogFilters();
     }});
+    document.getElementById("catalogResetFilters").addEventListener("click", () => {{
+      setCatalogFilterValues({{}});
+      syncCatalogFilterState(true);
+      applyCatalogFilters();
+    }});
+    restoreCatalogFilters();
+    syncCatalogFilterState();
     applyCatalogFilters();
 
     function renderThumbs() {{

@@ -126,6 +126,7 @@ class CatalogSkuTests(SimpleTestCase):
         self.assertIn('id="catalogProductFilter"', html)
         self.assertIn('id="catalogSkuFilter"', html)
         self.assertIn('id="catalogCountryFilter"', html)
+        self.assertIn("storwyz.catalogAdmin.filters", html)
         self.assertIn("<th>Actions</th>", html)
         self.assertIn('data-product="ButchAxe RO butchaxe-ro"', html)
         self.assertIn('data-sku="2757"', html)
