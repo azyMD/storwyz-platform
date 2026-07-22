@@ -134,7 +134,7 @@ def catalog_admin(request):
     )
     brochure_rows = "\n".join(
         f"""
-        <tr>
+        <tr data-product="{escape(item["product_name"])} {escape(item["product_slug"])}" data-sku="{escape(item["product_sku"])}" data-country="{escape(item["country_label"])} {escape(item["country_code"])}">
           <td><strong>{escape(item["product_name"])}</strong><span>{escape(item["product_slug"])}</span></td>
           <td>{escape(item["product_sku"]) or '<span>Not set</span>'}</td>
           <td>{escape(item["country_label"])} <code>{escape(item["country_code"])}</code></td>
@@ -594,6 +594,14 @@ ADMIN_HTML = """
       font-weight: 800;
     }}
     .actions {{ margin-top: 16px; display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }}
+    .catalog-toolbar {{
+      margin-top: 14px;
+      display: grid;
+      grid-template-columns: repeat(3, minmax(160px, 1fr)) auto;
+      gap: 12px;
+      align-items: end;
+    }}
+    .catalog-count {{ margin-top: 10px; color: var(--muted); font-size: 13px; }}
     button {{
       height: 42px;
       border: 0;
@@ -627,6 +635,7 @@ ADMIN_HTML = """
     @media (max-width: 760px) {{
       header {{ align-items: flex-start; flex-direction: column; }}
       .grid {{ grid-template-columns: 1fr; }}
+      .catalog-toolbar {{ grid-template-columns: 1fr; }}
       section {{ padding: 16px; }}
       table {{ display: block; overflow-x: auto; white-space: nowrap; }}
     }}
@@ -679,7 +688,23 @@ ADMIN_HTML = """
 
     <section>
       <h2>Existing Brochures</h2>
-      <table>
+      <div class="catalog-toolbar" id="catalogFilters">
+        <div>
+          <label for="catalogProductFilter">Product</label>
+          <input id="catalogProductFilter" type="search" placeholder="Search product">
+        </div>
+        <div>
+          <label for="catalogSkuFilter">SKU</label>
+          <input id="catalogSkuFilter" type="search" placeholder="Search SKU">
+        </div>
+        <div>
+          <label for="catalogCountryFilter">Country</label>
+          <input id="catalogCountryFilter" type="search" placeholder="Search country">
+        </div>
+        <button class="secondary" type="button" id="catalogResetFilters">Reset</button>
+      </div>
+      <p class="catalog-count" id="catalogResultCount"></p>
+      <table id="catalogTable">
         <thead>
           <tr>
             <th>Product</th>
@@ -688,6 +713,7 @@ ADMIN_HTML = """
             <th>Pages</th>
             <th>Current Link</th>
             <th>Subdomain Link</th>
+            <th>Actions</th>
           </tr>
         </thead>
         <tbody>
@@ -704,7 +730,43 @@ ADMIN_HTML = """
     const statusText = document.getElementById("statusText");
     const resultBox = document.getElementById("resultBox");
     const clearButton = document.getElementById("clearButton");
+    const catalogFilters = document.getElementById("catalogFilters");
+    const catalogResultCount = document.getElementById("catalogResultCount");
+    const catalogRows = Array.from(document.querySelectorAll("#catalogTable tbody tr")).filter((row) => !row.classList.contains("empty"));
     let selected = [];
+
+    function normalizeFilterValue(value) {{
+      return (value || "").toLowerCase().normalize("NFD").replace(/[\\u0300-\\u036f]/g, "").trim();
+    }}
+
+    function applyCatalogFilters() {{
+      if (!catalogRows.length) {{
+        catalogResultCount.textContent = "";
+        return;
+      }}
+      const product = normalizeFilterValue(document.getElementById("catalogProductFilter").value);
+      const sku = normalizeFilterValue(document.getElementById("catalogSkuFilter").value);
+      const country = normalizeFilterValue(document.getElementById("catalogCountryFilter").value);
+      let visible = 0;
+      catalogRows.forEach((row) => {{
+        const matchesProduct = !product || normalizeFilterValue(row.dataset.product).includes(product);
+        const matchesSku = !sku || normalizeFilterValue(row.dataset.sku).includes(sku);
+        const matchesCountry = !country || normalizeFilterValue(row.dataset.country).includes(country);
+        const isVisible = matchesProduct && matchesSku && matchesCountry;
+        row.hidden = !isVisible;
+        if (isVisible) visible += 1;
+      }});
+      catalogResultCount.textContent = `${{visible}} of ${{catalogRows.length}} brochures shown`;
+    }}
+
+    catalogFilters.addEventListener("input", applyCatalogFilters);
+    document.getElementById("catalogResetFilters").addEventListener("click", () => {{
+      catalogFilters.querySelectorAll("input").forEach((input) => {{
+        input.value = "";
+      }});
+      applyCatalogFilters();
+    }});
+    applyCatalogFilters();
 
     function renderThumbs() {{
       thumbs.innerHTML = "";

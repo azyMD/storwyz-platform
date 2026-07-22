@@ -1,6 +1,6 @@
 # Catalog And Shortlinks
 
-Last updated: 2026-07-20
+Last updated: 2026-07-22
 
 These are separate functional modules inside `storwyz-platform`, not separate repositories.
 
@@ -14,6 +14,7 @@ Purpose:
 - Catalog brochures no longer enforce a fixed page-count limit; all uploaded valid images are kept.
 - Every product brochure stores and displays its product SKU in `manifest.json` and Catalog Admin.
 - Catalog Admin includes a POST-only delete action for existing brochures.
+- Catalog Admin includes client-side column filters for product, SKU and country.
 - Catalog admin and public viewer UI are in English.
 - Supported country codes include `cz` Czechia, `sk` Slovakia, `hr` Croatia and `tr` Turkey.
 

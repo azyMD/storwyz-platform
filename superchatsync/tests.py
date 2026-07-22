@@ -102,6 +102,35 @@ class CatalogSkuTests(SimpleTestCase):
             self.assertEqual(response.status_code, 302)
             self.assertFalse(catalog_path.exists())
 
+    def test_admin_includes_column_filters(self):
+        request = RequestFactory().get("/catalog-admin/")
+        request.session = {catalog_builder.CATALOG_SESSION_KEY: True}
+        brochures = [
+            {
+                "product_name": "ButchAxe RO",
+                "product_sku": "2757",
+                "product_slug": "butchaxe-ro",
+                "country_code": "ro",
+                "country_label": "Romania",
+                "page_count": 2,
+                "updated_at": "2026-07-22T10:00:00Z",
+                "desired_url": "https://catalog.storwyz.com/butchaxe-ro/ro/",
+                "local_path": "/catalog/butchaxe-ro/ro/",
+            }
+        ]
+
+        with patch.object(catalog_builder, "_list_brochures", return_value=brochures):
+            response = catalog_builder.catalog_admin(request)
+
+        html = response.content.decode("utf-8")
+        self.assertIn('id="catalogProductFilter"', html)
+        self.assertIn('id="catalogSkuFilter"', html)
+        self.assertIn('id="catalogCountryFilter"', html)
+        self.assertIn("<th>Actions</th>", html)
+        self.assertIn('data-product="ButchAxe RO butchaxe-ro"', html)
+        self.assertIn('data-sku="2757"', html)
+        self.assertIn('data-country="Romania ro"', html)
+
 
 class LandingLeadValidationTests(SimpleTestCase):
     def test_valid_payload_is_normalized_for_fitspace(self):
